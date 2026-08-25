@@ -1,337 +1,204 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영업 대시보드</title>
-<link rel="stylesheet" as="style" crossorigin
-  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
-<style>
-  :root{
-    --blue:#2563eb;
-    --blue-light:#bfdbfe;
-    --blue-lighter:#eff6ff;
-    --gray-900:#111827;
-    --gray-600:#4b5563;
-    --gray-400:#9ca3af;
-    --gray-200:#e5e7eb;
-    --gray-100:#f3f4f6;
-  }
-  *{box-sizing:border-box;}
-  body{
-    margin:0;
-    font-family:'Pretendard', -apple-system, sans-serif;
-    background:#f9fafb;
-    color:var(--gray-900);
-    padding:20px;
-  }
-  h1{
-    font-size:20px;
-    margin:0 0 16px 4px;
-    font-weight:700;
-  }
-  .cards{
-    display:grid;
-    grid-template-columns:1.6fr 1fr 1fr 1fr;
-    gap:14px;
-    margin-bottom:14px;
-  }
-  .card{
-    background:#fff;
-    border:1px solid var(--gray-200);
-    border-radius:14px;
-    padding:18px 20px;
-  }
-  .card .label{
-    font-size:13px;
-    color:var(--gray-600);
-    margin-bottom:8px;
-  }
-  .card .value{
-    font-size:22px;
-    font-weight:700;
-  }
-  .card.main .value{
-    font-size:32px;
-  }
-  .card .sub{
-    font-size:12px;
-    color:var(--gray-400);
-    margin-top:6px;
-  }
-  .progress-bar{
-    margin-top:12px;
-    height:8px;
-    background:var(--gray-100);
-    border-radius:999px;
-    overflow:hidden;
-  }
-  .progress-fill{
-    height:100%;
-    background:var(--blue);
-    border-radius:999px;
-    transition:width .4s ease;
-  }
-  .progress-text{
-    font-size:12px;
-    color:var(--blue);
-    font-weight:600;
-    margin-top:6px;
-  }
-  .panels{
-    display:grid;
-    grid-template-columns:1.4fr 1fr;
-    gap:14px;
-    margin-bottom:14px;
-  }
-  .panel{
-    background:#fff;
-    border:1px solid var(--gray-200);
-    border-radius:14px;
-    padding:18px 20px;
-  }
-  .panel-title{
-    font-size:14px;
-    font-weight:700;
-    margin-bottom:12px;
-  }
-  .rank-row{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    margin-bottom:10px;
-    font-size:13px;
-  }
-  .rank-name{
-    width:70px;
-    flex-shrink:0;
-    color:var(--gray-600);
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  }
-  .rank-bar-bg{
-    flex:1;
-    background:var(--gray-100);
-    border-radius:6px;
-    height:16px;
-    overflow:hidden;
-  }
-  .rank-bar-fill{
-    height:100%;
-    background:var(--blue);
-    border-radius:6px;
-  }
-  .rank-amount{
-    width:70px;
-    text-align:right;
-    flex-shrink:0;
-    font-weight:600;
-    font-size:12px;
-  }
-  .loading{
-    color:var(--gray-400);
-    font-size:13px;
-    padding:20px;
-  }
-  @media (max-width:900px){
-    .cards{grid-template-columns:1fr 1fr;}
-    .panels{grid-template-columns:1fr;}
-    .card.main{grid-column:span 2;}
-  }
-  @media (max-width:520px){
-    .cards{grid-template-columns:1fr;}
-    .card.main{grid-column:span 1;}
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>더 타코부스 경영관리</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f6f8;
+      color: #222;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #777;
+      margin-bottom: 24px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .card-title {
+      color: #777;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .amount {
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .section {
+      background: white;
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .section h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .row:last-child {
+      border-bottom: none;
+    }
+
+    .channel {
+      font-weight: 600;
+    }
+
+    .total {
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+    .notice {
+      background: #eef4ff;
+      border-radius: 12px;
+      padding: 18px;
+      color: #2455c3;
+    }
+
+    @media (max-width: 700px) {
+      .container {
+        padding: 16px;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .amount {
+        font-size: 25px;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-<h1>영업 대시보드</h1>
+  <div class="container">
 
-<div class="cards" id="cards">
-  <div class="loading">불러오는 중...</div>
-</div>
+    <h1>더 타코부스 경영관리</h1>
+    <div class="subtitle">매장 운영 현황 · 2026년 8월</div>
 
-<div class="panels">
-  <div class="panel">
-    <div class="panel-title">월별 매출</div>
-    <div id="barChart"></div>
-  </div>
-  <div class="panel">
-    <div class="panel-title">영업 단계 깔때기</div>
-    <div id="funnelChart"></div>
-  </div>
-</div>
+    <div class="cards">
 
-<div class="panels">
-  <div class="panel">
-    <div class="panel-title">담당자별 순위</div>
-    <div id="personRank"></div>
-  </div>
-  <div class="panel">
-    <div class="panel-title">상품별 순위</div>
-    <div id="productRank"></div>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const { createClient } = supabase;
-  const db = createClient(
-    "https://zghzedcsrkfydtxvimgf.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnaHplZGNzcmtmeWR0eHZpbWdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA3NjQsImV4cCI6MjEwMzE2Njc2NH0.SoALJGehZYSMImkHo2EF_AZOtWM9Tew314-iB9vbjQA"
-  );
-
-  const fmt = n => Number(n).toLocaleString('ko-KR');
-
-  async function loadDashboard(){
-    const [{data: monthly}, {data: pipeline}, {data: rank}] = await Promise.all([
-      db.from('sales_monthly').select('*').order('sort_order', {ascending:true}),
-      db.from('sales_pipeline').select('*').order('sort_order', {ascending:true}),
-      db.from('sales_rank').select('*')
-    ]);
-
-    if(!monthly || !monthly.length || !pipeline || !pipeline.length){
-      document.getElementById('cards').innerHTML = '<div class="loading">데이터를 불러오지 못했습니다.</div>';
-      return;
-    }
-
-    renderCards(monthly, pipeline);
-    renderBarChart(monthly);
-    renderFunnel(pipeline);
-
-    const persons = (rank||[]).filter(r=>r.kind==='person').sort((a,b)=>b.amount-a.amount);
-    const products = (rank||[]).filter(r=>r.kind==='product').sort((a,b)=>b.amount-a.amount);
-    renderRank('personRank', persons);
-    renderRank('productRank', products);
-  }
-
-  function renderCards(monthly, pipeline){
-    const current = monthly[monthly.length-1];
-    const dealCount = pipeline[pipeline.length-1].count;
-    const achievement = Math.min(100, Math.round((current.revenue / current.target) * 100));
-    const remain = Math.max(0, current.target - current.revenue);
-    const unitPrice = dealCount > 0 ? Math.round(current.revenue / dealCount) : 0;
-
-    document.getElementById('cards').innerHTML = `
-      <div class="card main">
-        <div class="label">이번 달 매출 (${current.month})</div>
-        <div class="value">${fmt(current.revenue)}</div>
-        <div class="progress-bar"><div class="progress-fill" style="width:${achievement}%"></div></div>
-        <div class="progress-text">목표 대비 ${achievement}% 달성</div>
-      </div>
       <div class="card">
-        <div class="label">이번 달 목표</div>
-        <div class="value">${fmt(current.target)}</div>
-        <div class="sub">남은 금액 ${fmt(remain)}</div>
+        <div class="card-title">8월 24일 총매출</div>
+        <div class="amount">1,045,000원</div>
       </div>
+
       <div class="card">
-        <div class="label">객단가</div>
-        <div class="value">${fmt(unitPrice)}</div>
-        <div class="sub">매출 ÷ 계약 건수</div>
+        <div class="card-title">8월 누적 매출</div>
+        <div class="amount">1,045,000원</div>
       </div>
+
       <div class="card">
-        <div class="label">계약 건수</div>
-        <div class="value">${fmt(dealCount)}</div>
-        <div class="sub">${pipeline[pipeline.length-1].stage}</div>
+        <div class="card-title">오늘 확인할 데이터</div>
+        <div class="amount">3건</div>
       </div>
-    `;
-  }
 
-  function renderBarChart(monthly){
-    const W = 640, H = 300, padL = 50, padB = 30, padT = 20, padR = 10;
-    const chartW = W - padL - padR;
-    const chartH = H - padT - padB;
-    const maxVal = Math.max(...monthly.map(m=>Math.max(m.revenue, m.target))) * 1.15;
-    const barGap = chartW / monthly.length;
-    const barW = barGap * 0.5;
-    const targetY = padT + chartH - (monthly[monthly.length-1].target / maxVal) * chartH;
+    </div>
 
-    let bars = '';
-    let labels = '';
-    monthly.forEach((m, i)=>{
-      const x = padL + i*barGap + (barGap - barW)/2;
-      const h = (m.revenue / maxVal) * chartH;
-      const y = padT + chartH - h;
-      const isCurrent = i === monthly.length - 1;
-      bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="4"
-                fill="${isCurrent ? 'var(--blue)' : 'var(--blue-light)'}"></rect>`;
-      bars += `<text x="${x + barW/2}" y="${y-8}" text-anchor="middle" font-size="11"
-                fill="${isCurrent ? '#1e40af' : '#9ca3af'}" font-weight="${isCurrent?'700':'400'}">${fmt(m.revenue)}</text>`;
-      labels += `<text x="${x + barW/2}" y="${H-padB+18}" text-anchor="middle" font-size="12" fill="#6b7280">${m.month}</text>`;
-    });
+    <div class="section">
 
-    const svg = `
-    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;">
-      <line x1="${padL}" y1="${targetY}" x2="${W-padR}" y2="${targetY}"
-            stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5,4"></line>
-      <text x="${W-padR}" y="${targetY-6}" text-anchor="end" font-size="11" fill="#9ca3af">목표 ${fmt(monthly[monthly.length-1].target)}</text>
-      ${bars}
-      ${labels}
-      <line x1="${padL}" y1="${padT+chartH}" x2="${W-padR}" y2="${padT+chartH}" stroke="#e5e7eb"></line>
-    </svg>`;
-    document.getElementById('barChart').innerHTML = svg;
-  }
+      <h2>8월 24일 매출</h2>
 
-  function renderFunnel(pipeline){
-    const W = 400, rowH = 60, gap = 14;
-    const H = pipeline.length * rowH + (pipeline.length-1) * 30 + 20;
-    const maxCount = pipeline[0].count;
-    const maxWidth = W - 40;
-
-    let shapes = '';
-    let y = 10;
-    pipeline.forEach((stage, i)=>{
-      const wRatio = stage.count / maxCount;
-      const w = Math.max(maxWidth * wRatio, 40);
-      const x = (W - w) / 2;
-      const opacity = 0.35 + 0.65 * (1 - i/(pipeline.length-1||1));
-
-      shapes += `<rect x="${x}" y="${y}" width="${w}" height="${rowH-14}" rx="8"
-                  fill="var(--blue)" opacity="${opacity.toFixed(2)}"></rect>`;
-      shapes += `<text x="${W/2}" y="${y + (rowH-14)/2 - 4}" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">${stage.stage}</text>`;
-      shapes += `<text x="${W/2}" y="${y + (rowH-14)/2 + 13}" text-anchor="middle" fill="#fff" font-size="11">${fmt(stage.count)}건</text>`;
-
-      if(i < pipeline.length - 1){
-        const next = pipeline[i+1];
-        const rate = stage.count > 0 ? Math.round((next.count / stage.count) * 100) : 0;
-        shapes += `<text x="${W/2}" y="${y + rowH + 12}" text-anchor="middle" fill="#2563eb" font-size="12" font-weight="600">↓ ${rate}%</text>`;
-      }
-      y += rowH + 30;
-    });
-
-    const finalRate = pipeline[0].count > 0
-      ? Math.round((pipeline[pipeline.length-1].count / pipeline[0].count) * 100)
-      : 0;
-
-    const svg = `
-    <svg viewBox="0 0 ${W} ${H+20}" style="width:100%;height:auto;">
-      ${shapes}
-      <text x="${W/2}" y="${H+12}" text-anchor="middle" font-size="13" fill="#111827" font-weight="700">최종 전환율 ${finalRate}%</text>
-    </svg>`;
-    document.getElementById('funnelChart').innerHTML = svg;
-  }
-
-  function renderRank(elId, list){
-    const el = document.getElementById(elId);
-    if(!list.length){
-      el.innerHTML = '<div class="loading">데이터 없음</div>';
-      return;
-    }
-    const max = Math.max(...list.map(r=>r.amount));
-    el.innerHTML = list.map(r=>`
-      <div class="rank-row">
-        <div class="rank-name">${r.name}</div>
-        <div class="rank-bar-bg">
-          <div class="rank-bar-fill" style="width:${(r.amount/max*100).toFixed(1)}%"></div>
-        </div>
-        <div class="rank-amount">${fmt(r.amount)}</div>
+      <div class="row">
+        <span class="channel">홀</span>
+        <strong>605,400원</strong>
       </div>
-    `).join('');
-  }
 
-  loadDashboard();
-</script>
+      <div class="row">
+        <span class="channel">배달의민족</span>
+        <strong>21,000원</strong>
+      </div>
+
+      <div class="row">
+        <span class="channel">쿠팡이츠</span>
+        <strong>418,600원</strong>
+      </div>
+
+      <div class="row total">
+        <span>총매출</span>
+        <span>1,045,000원</span>
+      </div>
+
+    </div>
+
+    <div class="section">
+
+      <h2>매출 구성</h2>
+
+      <div class="row">
+        <span>홀</span>
+        <strong>57.9%</strong>
+      </div>
+
+      <div class="row">
+        <span>배달의민족</span>
+        <strong>2.0%</strong>
+      </div>
+
+      <div class="row">
+        <span>쿠팡이츠</span>
+        <strong>40.1%</strong>
+      </div>
+
+    </div>
+
+    <div class="section">
+
+      <h2>경영 현황</h2>
+
+      <div class="notice">
+        현재는 매출 데이터가 연결된 상태입니다.<br><br>
+        다음 단계에서는 지출 데이터를 연결해서
+        <strong>매출 - 지출 = 실제 이익</strong>을 자동으로 계산하도록 만들 예정입니다.
+      </div>
+
+    </div>
+
+  </div>
+
 </body>
 </html>
