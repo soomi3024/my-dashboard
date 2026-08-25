@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>더 타코부스 경영관리</title>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     * {
       box-sizing: border-box;
@@ -90,11 +92,18 @@
       font-weight: bold;
     }
 
-    .notice {
-      background: #eef4ff;
-      border-radius: 12px;
-      padding: 18px;
-      color: #2455c3;
+    .loading {
+      text-align: center;
+      padding: 30px;
+      color: #777;
+    }
+
+    .error {
+      background: #fff0f0;
+      color: #c62828;
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 20px;
     }
 
     @media (max-width: 700px) {
@@ -115,90 +124,263 @@
 
 <body>
 
-  <div class="container">
+<div class="container">
 
-    <h1>더 타코부스 경영관리</h1>
-    <div class="subtitle">매장 운영 현황 · 2026년 8월</div>
+  <h1>더 타코부스 경영관리</h1>
+  <div class="subtitle">매장 운영 현황</div>
+
+  <div id="loading" class="loading">
+    매출 데이터를 불러오는 중...
+  </div>
+
+  <div id="error" class="error" style="display:none;"></div>
+
+  <div id="dashboard" style="display:none;">
 
     <div class="cards">
 
       <div class="card">
-        <div class="card-title">8월 24일 총매출</div>
-        <div class="amount">1,045,000원</div>
+        <div class="card-title">오늘 매출</div>
+        <div class="amount" id="todaySales">0원</div>
       </div>
 
       <div class="card">
         <div class="card-title">8월 누적 매출</div>
-        <div class="amount">1,045,000원</div>
+        <div class="amount" id="monthlySales">0원</div>
       </div>
 
       <div class="card">
-        <div class="card-title">오늘 확인할 데이터</div>
-        <div class="amount">3건</div>
+        <div class="card-title">매출 건수</div>
+        <div class="amount" id="salesCount">0건</div>
       </div>
 
     </div>
 
     <div class="section">
 
-      <h2>8월 24일 매출</h2>
+      <h2 id="latestTitle">최근 매출</h2>
 
-      <div class="row">
-        <span class="channel">홀</span>
-        <strong>605,400원</strong>
-      </div>
-
-      <div class="row">
-        <span class="channel">배달의민족</span>
-        <strong>21,000원</strong>
-      </div>
-
-      <div class="row">
-        <span class="channel">쿠팡이츠</span>
-        <strong>418,600원</strong>
-      </div>
+      <div id="salesList"></div>
 
       <div class="row total">
         <span>총매출</span>
-        <span>1,045,000원</span>
+        <span id="totalSales">0원</span>
       </div>
 
     </div>
 
     <div class="section">
 
-      <h2>매출 구성</h2>
+      <h2>매출 채널별 분석</h2>
 
-      <div class="row">
-        <span>홀</span>
-        <strong>57.9%</strong>
-      </div>
-
-      <div class="row">
-        <span>배달의민족</span>
-        <strong>2.0%</strong>
-      </div>
-
-      <div class="row">
-        <span>쿠팡이츠</span>
-        <strong>40.1%</strong>
-      </div>
-
-    </div>
-
-    <div class="section">
-
-      <h2>경영 현황</h2>
-
-      <div class="notice">
-        현재는 매출 데이터가 연결된 상태입니다.<br><br>
-        다음 단계에서는 지출 데이터를 연결해서
-        <strong>매출 - 지출 = 실제 이익</strong>을 자동으로 계산하도록 만들 예정입니다.
-      </div>
+      <div id="channelList"></div>
 
     </div>
 
   </div>
+
+</div>
+
+<script>
+
+  // ==============================
+  // Supabase 연결 정보
+  // ==============================
+
+  const SUPABASE_URL =
+    "https://zghzedcsrkfydtxvimfg.supabase.co";
+
+  const SUPABASE_PUBLISHABLE_KEY =
+    "sb_publishable_AP9jGgMMGoBx3hHyAXj60Q_JtVP5xlZ";
+
+  const supabaseClient =
+    window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY
+    );
+
+
+  // ==============================
+  // 숫자를 원화로 표시
+  // ==============================
+
+  function won(number) {
+    return Number(number).toLocaleString("ko-KR") + "원";
+  }
+
+
+  // ==============================
+  // 매출 데이터 불러오기
+  // ==============================
+
+  async function loadSales() {
+
+    const loading = document.getElementById("loading");
+    const errorBox = document.getElementById("error");
+    const dashboard = document.getElementById("dashboard");
+
+    try {
+
+      const { data, error } = await supabaseClient
+        .from("sales")
+        .select("*")
+        .order("sale_date", { ascending: false })
+        .order("id", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error("등록된 매출 데이터가 없습니다.");
+      }
+
+
+      // ==============================
+      // 전체 매출
+      // ==============================
+
+      const total = data.reduce(
+        (sum, row) => sum + Number(row.amount),
+        0
+      );
+
+
+      // ==============================
+      // 오늘 매출
+      // ==============================
+
+      const today = new Date()
+        .toISOString()
+        .split("T")[0];
+
+      const todayTotal = data
+        .filter(row => row.sale_date === today)
+        .reduce(
+          (sum, row) => sum + Number(row.amount),
+          0
+        );
+
+
+      // ==============================
+      // 화면 숫자 표시
+      // ==============================
+
+      document.getElementById("todaySales").textContent =
+        won(todayTotal);
+
+      document.getElementById("monthlySales").textContent =
+        won(total);
+
+      document.getElementById("totalSales").textContent =
+        won(total);
+
+      document.getElementById("salesCount").textContent =
+        data.length + "건";
+
+
+      // ==============================
+      // 최근 매출
+      // ==============================
+
+      const salesList =
+        document.getElementById("salesList");
+
+      salesList.innerHTML = "";
+
+      data.slice(0, 20).forEach(row => {
+
+        const div = document.createElement("div");
+
+        div.className = "row";
+
+        div.innerHTML = `
+          <span>
+            <strong>${row.channel}</strong>
+            <br>
+            <small>${row.sale_date}</small>
+          </span>
+
+          <strong>${won(row.amount)}</strong>
+        `;
+
+        salesList.appendChild(div);
+
+      });
+
+
+      // ==============================
+      // 채널별 매출
+      // ==============================
+
+      const channels = {};
+
+      data.forEach(row => {
+
+        if (!channels[row.channel]) {
+          channels[row.channel] = 0;
+        }
+
+        channels[row.channel] += Number(row.amount);
+
+      });
+
+
+      const channelList =
+        document.getElementById("channelList");
+
+      channelList.innerHTML = "";
+
+      Object.entries(channels)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([channel, amount]) => {
+
+          const percentage =
+            total > 0
+              ? ((amount / total) * 100).toFixed(1)
+              : 0;
+
+          const div =
+            document.createElement("div");
+
+          div.className = "row";
+
+          div.innerHTML = `
+            <span>${channel}</span>
+            <strong>
+              ${won(amount)}
+              (${percentage}%)
+            </strong>
+          `;
+
+          channelList.appendChild(div);
+
+        });
+
+
+      loading.style.display = "none";
+      dashboard.style.display = "block";
+
+    } catch (error) {
+
+      console.error(error);
+
+      loading.style.display = "none";
+
+      errorBox.style.display = "block";
+
+      errorBox.textContent =
+        "매출 데이터를 불러오지 못했습니다: " +
+        error.message;
+
+    }
+
+  }
+
+
+  loadSales();
+
+</script>
 
 </body>
 </html>
