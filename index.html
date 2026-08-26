@@ -504,6 +504,7 @@
 </div>
     
 <script>
+
   let selectedProfitSales = 0;
 
 async function loadProfitSales() {
@@ -512,6 +513,7 @@ async function loadProfitSales() {
   if (!month) {
     selectedProfitSales = 0;
     document.getElementById("profitSales").textContent = "0원";
+    calculateMonthlyProfit();
     return;
   }
 
@@ -545,7 +547,144 @@ async function loadProfitSales() {
 
   document.getElementById("profitSales").textContent =
     won(selectedProfitSales);
+
+  calculateMonthlyProfit();
 }
+
+function calculateMonthlyProfit() {
+  const sales = selectedProfitSales || 0;
+
+  const logistics =
+    Number(document.getElementById("profitLogistics").value || 0);
+
+  const deliveryFee =
+    Number(document.getElementById("profitDeliveryFee").value || 0);
+
+  const cardFee =
+    Number(document.getElementById("profitCardFee").value || 0);
+
+  const advertising =
+    Number(document.getElementById("profitAdvertising").value || 0);
+
+  const royalty =
+    Math.round(sales * 0.02 * 1.1);
+  
+  document.getElementById("profitRoyaltyBase").value =
+  royalty;
+
+  const gas =
+    Number(document.getElementById("profitGas").value || 0);
+
+  const utility =
+    Number(document.getElementById("profitUtility").value || 0);
+
+  const insurance =
+    Number(document.getElementById("profitInsurance").value || 0);
+
+  const labor =
+    Number(document.getElementById("profitLabor").value || 0);
+
+  const rent =
+    Number(document.getElementById("profitRent").value || 0);
+
+  const torder =
+    Number(document.getElementById("profitTorder").value || 0);
+
+  const pos =
+    Number(document.getElementById("profitPos").value || 0);
+
+  const accountant =
+    Number(document.getElementById("profitTaxAccountant").value || 0);
+
+  const otherFixed =
+    Number(document.getElementById("profitOtherFixed").value || 0);
+
+  const loanInterest =
+    Number(document.getElementById("profitLoanInterest").value || 0);
+
+  const other =
+    Number(document.getElementById("profitOther").value || 0);
+
+  const totalVariable =
+    logistics +
+    deliveryFee +
+    cardFee +
+    advertising +
+    royalty +
+    gas +
+    utility +
+    insurance;
+
+  const totalFixed =
+    labor +
+    rent +
+    torder +
+    pos +
+    accountant +
+    otherFixed;
+
+  const totalFinancial = loanInterest;
+
+  const netProfit =
+    sales -
+    totalVariable -
+    totalFixed -
+    totalFinancial -
+    other;
+
+  const profitRate =
+    sales > 0
+      ? ((netProfit / sales) * 100).toFixed(1)
+      : "0.0";
+
+  document.getElementById("profitSales").textContent =
+    won(sales);
+
+  document.getElementById("profitVariableCost").textContent =
+    won(totalVariable);
+
+  document.getElementById("profitFixedCost").textContent =
+    won(totalFixed);
+
+  document.getElementById("profitFinancialCost").textContent =
+    won(totalFinancial);
+
+  document.getElementById("profitOtherCost").textContent =
+    won(other);
+
+  document.getElementById("profitNet").textContent =
+    won(netProfit);
+
+  document.getElementById("profitRate").textContent =
+    profitRate + "%";
+}
+
+const profitInputIds = [
+  "profitLogistics",
+  "profitDeliveryFee",
+  "profitCardFee",
+  "profitAdvertising",
+  "profitGas",
+  "profitUtility",
+  "profitInsurance",
+  "profitLabor",
+  "profitRent",
+  "profitTorder",
+  "profitPos",
+  "profitTaxAccountant",
+  "profitOtherFixed",
+  "profitLoanInterest",
+  "profitOther"
+];
+
+profitInputIds.forEach(id => {
+  const element = document.getElementById(id);
+
+  if (element) {
+    element.addEventListener("input", calculateMonthlyProfit);
+    element.addEventListener("change", calculateMonthlyProfit);
+  }
+});
 
 const profitMonthInput =
   document.getElementById("profitMonth");
