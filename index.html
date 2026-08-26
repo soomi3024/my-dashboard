@@ -243,7 +243,41 @@
          ============================== -->
 
     <div class="section">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">
 
+  <div>
+    <label style="display:block;font-size:13px;color:#777;margin-bottom:5px;">
+      매출 조회 월
+    </label>
+
+    <input
+      type="month"
+      id="saleMonthFilter"
+      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;"
+    >
+  </div>
+
+  <div>
+    <label style="display:block;font-size:13px;color:#777;margin-bottom:5px;">
+      매출 조회 날짜
+    </label>
+
+    <input
+      type="date"
+      id="saleDateFilter"
+      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;"
+    >
+  </div>
+
+</div>
+
+<button
+  type="button"
+  onclick="clearSaleFilter()"
+  style="margin-bottom:15px;padding:9px 14px;border:1px solid #ccc;border-radius:8px;background:white;cursor:pointer;"
+>
+  전체 매출 보기
+</button>
       <h2>매출 등록</h2>
 
       <div class="deposit-form">
@@ -296,6 +330,41 @@
 
   <div class="section">
   <h2>정산 관리</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">
+
+  <div>
+    <label style="display:block;font-size:13px;color:#777;margin-bottom:5px;">
+      조회 월
+    </label>
+
+    <input
+      type="month"
+      id="depositMonthFilter"
+      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;"
+    >
+  </div>
+
+  <div>
+    <label style="display:block;font-size:13px;color:#777;margin-bottom:5px;">
+      조회 날짜
+    </label>
+
+    <input
+      type="date"
+      id="depositDateFilter"
+      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;"
+    >
+  </div>
+
+</div>
+
+<button
+  type="button"
+  onclick="clearDepositFilter()"
+  style="margin-bottom:15px;padding:9px 14px;border:1px solid #ccc;border-radius:8px;background:white;cursor:pointer;"
+>
+  전체 정산 보기
+</button>
 
   <div class="deposit-form">
  <h3>정산 등록</h3>
@@ -816,10 +885,30 @@ if (profitMonthInput) {
       // 전체 매출
       // ==============================
 
-      const total = data.reduce(
-        (sum, row) => sum + Number(row.amount),
-        0
-      );
+     const saleMonthFilter =
+  document.getElementById("saleMonthFilter").value;
+
+const saleDateFilter =
+  document.getElementById("saleDateFilter").value;
+
+let filteredSales = data || [];
+
+if (saleMonthFilter) {
+  filteredSales = filteredSales.filter(row =>
+    row.sale_date &&
+    row.sale_date.startsWith(saleMonthFilter)
+  );
+}
+
+if (saleDateFilter) {
+  filteredSales = filteredSales.filter(row =>
+    row.sale_date === saleDateFilter
+  );
+}
+      const total = filteredSales.reduce(
+  (sum, row) => sum + Number(row.amount),
+  0
+);
 
 
       // ==============================
@@ -851,8 +940,8 @@ if (profitMonthInput) {
       document.getElementById("totalSales").textContent =
         won(total);
 
-      document.getElementById("salesCount").textContent =
-        data.length + "건";
+     document.getElementById("salesCount").textContent =
+  filteredSales.length + "건";
 
 
       // ==============================
@@ -864,7 +953,7 @@ if (profitMonthInput) {
 
     salesList.innerHTML = "";
 
-data.slice(0, 20).forEach(row => {
+filteredSales.slice(0, 20).forEach(row => {
 
   const div = document.createElement("div");
 
@@ -908,7 +997,7 @@ data.slice(0, 20).forEach(row => {
 
       const channels = {};
 
-      data.forEach(row => {
+    filteredSales.forEach(row => {
 
         if (!channels[row.channel]) {
           channels[row.channel] = 0;
@@ -972,119 +1061,309 @@ data.slice(0, 20).forEach(row => {
 
 
   loadSales();
- async function loadDeposits() {
-  const depositList = document.getElementById("depositList");
-  const totalDeposit = document.getElementById("totalDeposit");
-  const totalFee = document.getElementById("totalFee");
+async function loadDeposits() {
+
+  const depositList =
+    document.getElementById("depositList");
+
+  const totalDeposit =
+    document.getElementById("totalDeposit");
+
+  const totalFee =
+    document.getElementById("totalFee");
+
+  const monthFilter =
+    document.getElementById("depositMonthFilter").value;
+
+  const dateFilter =
+    document.getElementById("depositDateFilter").value;
 
   try {
-    const { data, error } = await supabaseClient
-      .from("deposit_details")
-      .select("*")
-      .order("deposit_date", { ascending: false })
-      .order("id", { ascending: false });
+
+    const { data, error } =
+      await supabaseClient
+        .from("deposit_details")
+        .select("*")
+        .order("deposit_date", { ascending: false })
+        .order("id", { ascending: false });
 
     if (error) {
       throw error;
     }
 
-    if (!data || data.length === 0) {
-      depositList.innerHTML = "<p>등록된 정산 데이터가 없습니다.</p>";
+    let filteredData = data || [];
+
+    // =========================
+    // 월 필터
+    // =========================
+
+    if (monthFilter) {
+
+      filteredData =
+        filteredData.filter(item =>
+          item.deposit_date &&
+          item.deposit_date.startsWith(monthFilter)
+        );
+
+    }
+
+    // =========================
+    // 날짜 필터
+    // =========================
+
+    if (dateFilter) {
+
+      filteredData =
+        filteredData.filter(item =>
+          item.deposit_date === dateFilter
+        );
+
+    }
+
+    // =========================
+    // 데이터 없음
+    // =========================
+
+    if (filteredData.length === 0) {
+
+      depositList.innerHTML =
+        "<p>선택한 조건의 정산 데이터가 없습니다.</p>";
+
       totalDeposit.textContent = "0원";
       totalFee.textContent = "0원";
+
       return;
     }
 
     let depositSum = 0;
     let feeSum = 0;
 
-    depositList.innerHTML = data.map(item => {
-
-      const totalDeductions =
-        Number(item.brokerage_fee || 0) +
-        Number(item.delivery_fee || 0) +
-        Number(item.coupon_discount || 0) +
-        Number(item.instant_discount || 0) +
-        Number(item.advertising_fee || 0) +
-        Number(item.payment_fee || 0) +
-        Number(item.vat_1 || 0);
-
-      const adjustments =
-        Number(item.fee_adjustment || 0) +
-        Number(item.vat_2_adjustment || 0);
-
-      const actualFee = totalDeductions - adjustments;
-
-      depositSum += Number(item.deposit_amount || 0);
-      feeSum += actualFee;
-
-      const settlementRate =
-        Number(item.sales_amount || 0) > 0
-          ? (Number(item.deposit_amount || 0) / Number(item.sales_amount || 0) * 100).toFixed(1)
-          : "0.0";
-
-      return `
-        <div class="row" style="padding:18px 0;border-bottom:1px solid #eee;">
-          <div>
-            <strong>${item.channel}</strong>
-            <div style="font-size:13px;color:#777;">
-              ${item.deposit_date}
-            </div>
-
-            <div style="margin-top:10px;font-size:13px;line-height:1.8;color:#555;">
-              매출 ${won(item.sales_amount)} ·
-              중개 ${won(item.brokerage_fee)} ·
-              배달비 ${won(item.delivery_fee)}<br>
-
-              쿠폰 ${won(item.coupon_discount)} ·
-              즉시할인 ${won(item.instant_discount)} ·
-              광고비 ${won(item.advertising_fee)}<br>
-
-              결제수수료 ${won(item.payment_fee)} ·
-              부가세 ${won(item.vat_1)}<br>
-
-              수수료 보정 ${won(item.fee_adjustment)} ·
-              부가세 보정 ${won(item.vat_2_adjustment)}
-            </div>
-          </div>
-
-          <div style="text-align:right;margin-top:10px;">
-            <strong>${won(item.deposit_amount)}</strong>
-
-            <div style="font-size:13px;color:#777;">
-              매출 ${won(item.sales_amount)}
-            </div>
-
-            <div style="font-size:13px;color:#777;">
-              실제 정산율 ${settlementRate}%
-            </div>
-
-            <div style="font-size:13px;color:#777;">
-              실제 차감액 ${won(actualFee)}
-            </div>
-          </div>
-        </div>
-      `;
-    }).join("");
-
-    totalDeposit.textContent = won(depositSum);
-    totalFee.textContent = won(feeSum);
-
-  } catch (error) {
-    console.error(error);
+    // =========================
+    // 정산 목록
+    // =========================
 
     depositList.innerHTML =
-      `<p style="color:red;">정산 데이터를 불러오지 못했습니다: ${error.message}</p>`;
+      filteredData.map(item => {
 
-    totalDeposit.textContent = "0원";
-    totalFee.textContent = "0원";
-  }
-}
+        const totalDeductions =
+          Number(item.brokerage_fee || 0) +
+          Number(item.delivery_fee || 0) +
+          Number(item.coupon_discount || 0) +
+          Number(item.instant_discount || 0) +
+          Number(item.advertising_fee || 0) +
+          Number(item.payment_fee || 0) +
+          Number(item.vat || 0);
 
-loadSales();
+        const adjustments =
+          Number(item.fee_adjustment || 0) +
+          Number(item.vat_adjustment || 0);
+
+        const actualFee =
+          totalDeductions - adjustments;
+
+        depositSum +=
+          Number(item.deposit_amount || 0);
+
+        feeSum += actualFee;
+
+        const settlementRate =
+          Number(item.sales_amount || 0) > 0
+            ? (
+                Number(item.deposit_amount || 0) /
+                Number(item.sales_amount || 0) *
+                100
+              ).toFixed(1)
+            : "0.0";
+
+        return `
+          <div
+            class="row"
+            style="
+              padding:18px 0;
+              border-bottom:1px solid #eee;
+            "
+          >
+
+            <div>
+
+              <strong>
+               ${item.channel}
+              </strong>
+              
+              <div style="margin-top:8px;">
+
+  <button
+    type="button"
+    onclick="editDeposit(${item.id})"
+    style="margin-right:5px;"
+  >
+    수정
+  </button>
+
+  <button
+    type="button"
+    onclick="deleteDeposit(${item.id})"
+  >
+    삭제
+  </button>
+
+</div>
+
+              <div
+                style="
+                  font-size:13px;
+                  color:#777;
+                "
+              >
+                ${item.deposit_date}
+              </div>
+
+              <div
+                style="
+                  margin-top:10px;
+                  font-size:13px;
+                  line-height:1.8;
+                  color:#555;
+                "
+              >
+
+                매출 ${won(item.sales_amount)} ·
+                중개 ${won(item.brokerage_fee)} ·
+                배달비 ${won(item.delivery_fee)}
+                <br>
+
+                쿠폰 ${won(item.coupon_discount)} ·
+                즉시할인 ${won(item.instant_discount)} ·
+                광고비 ${won(item.advertising_fee)}
+                <br>
+
+                결제수수료 ${won(item.payment_fee)} ·
+                부가세 ${won(item.vat)}
+                <br>
+
+                수수료 보정 ${won(item.fee_adjustment)} ·
+                부가세 보정 ${won(item.vat_adjustment)}
+
+              </div>
+
+            </div>
+
+            <div
+              style="
+                text-align:right;
+                margin-top:10px;
+              "
+            >
+
+              <strong>
+                ${won(item.deposit_amount)}
+              </strong>
+
+              <div
+                style="
+                  font-size:13px;
+                  color:#777;
+                "
+              >
+                매출 ${won(item.sales_amount)}
+              </div>
+
+              <div
+                style="
+                  font-size:13px;
+                  color:#777;
+                "
+              >
+                실제 정산율 ${settlementRate}%
+              </div>
+
+              <div
+                style="
+                  font-size:13px;
+                  color:#777;
+                "
+              >
+                실제 차감액 ${won(actualFee)}
+              </div>
+
+            </div>
+
+          </div>
+        `;
+
+      }).join("");
+
+    // =========================
+    // 합계
+    // =========================
+
+    totalDeposit.textContent =
+      won(depositSum);
+
+    totalFee.textContent =
+      won(feeSum);
+}  //
+
+
+
+  loadSales();
 loadDeposits();
 
-  async function saveSale() {
+const saleMonthFilter =
+  document.getElementById("saleMonthFilter");
+
+const saleDateFilter =
+  document.getElementById("saleDateFilter");
+
+if (saleMonthFilter) {
+  saleMonthFilter.addEventListener(
+    "change",
+    loadSales
+  );
+}
+
+if (saleDateFilter) {
+  saleDateFilter.addEventListener(
+    "change",
+    loadSales
+  );
+}
+
+function clearSaleFilter() {
+
+  saleMonthFilter.value = "";
+  saleDateFilter.value = "";
+
+  loadSales();
+}
+
+const depositMonthFilter =
+  document.getElementById("depositMonthFilter");
+
+const depositDateFilter =
+  document.getElementById("depositDateFilter");
+
+if (depositMonthFilter) {
+  depositMonthFilter.addEventListener(
+    "change",
+    loadDeposits
+  );
+}
+
+if (depositDateFilter) {
+  depositDateFilter.addEventListener(
+    "change",
+    loadDeposits
+  );
+}
+
+function clearDepositFilter() {
+  depositMonthFilter.value = "";
+  depositDateFilter.value = "";
+  loadDeposits();
+}
+
+async function saveSale() {
 
   const saleDate =
     document.getElementById("saleDate").value;
@@ -1283,14 +1562,14 @@ async function editSale(id) {
 
     // 결제대행 수수료 3%
 const paymentFee = Math.ceil(
-  salesAmount * 0.014
+  salesAmount * 0.03
 );
 
-    document.getElementById("brokerageFee").value =
-      brokerageFee;
+document.getElementById("brokerageFee").value =
+  brokerageFee;
 
-    document.getElementById("paymentFee").value =
-      paymentFee;
+document.getElementById("paymentFee").value =
+  paymentFee;
 
     calculateDeposit();
     return;
@@ -1340,44 +1619,7 @@ const paymentFee = Math.ceil(
   // =========================
   calculateDeposit();
 }
-function calculateDeposit() {
-  const salesAmount = Number(document.getElementById("salesAmount").value || 0);
-  const brokerageFee = Number(document.getElementById("brokerageFee").value || 0);
-  const deliveryFee = Number(document.getElementById("deliveryFee").value || 0);
-  const couponDiscount = Number(document.getElementById("couponDiscount").value || 0);
-  const instantDiscount = Number(document.getElementById("instantDiscount").value || 0);
-  const advertisingFee = Number(document.getElementById("advertisingFee").value || 0);
-  const paymentFee = Number(document.getElementById("paymentFee").value || 0);
-  const vat = Number(document.getElementById("vat1").value || 0);
-  const feeAdjustment = Number(document.getElementById("feeAdjustment").value || 0);
-  const vatAdjustment = Number(document.getElementById("vat2Adjustment").value || 0);
 
-  const totalDeduction =
-    brokerageFee +
-    deliveryFee +
-    couponDiscount +
-    instantDiscount +
-    advertisingFee +
-    paymentFee +
-    vat;
-
-  const depositAmount =
-    salesAmount -
-    totalDeduction +
-    feeAdjustment +
-    vatAdjustment;
-
-  document.getElementById("depositAmount").value =
-    depositAmount > 0 ? depositAmount : 0;
-
-  const settlementRate =
-    salesAmount > 0
-      ? ((depositAmount / salesAmount) * 100).toFixed(1)
-      : "0.0";
-
-  document.getElementById("depositCalcInfo").textContent =
-    `예상 정산액 ${won(depositAmount)} · 실제 정산률 ${settlementRate}% · 총 차감액 ${won(salesAmount - depositAmount)}`;
-}
   function calculateDeposit() {
   const salesAmount = Number(document.getElementById("salesAmount").value || 0);
   const brokerageFee = Number(document.getElementById("brokerageFee").value || 0);
@@ -1492,6 +1734,114 @@ function calculateDeposit() {
   } catch (error) {
     console.error(error);
     alert("정산 저장에 실패했습니다: " + error.message);
+  }
+}
+  async function deleteDeposit(id) {
+
+  if (!confirm("이 정산 내역을 삭제하시겠습니까?")) {
+    return;
+  }
+
+  try {
+
+    const { error } = await supabaseClient
+      .from("deposit_details")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    alert("정산 내역이 삭제되었습니다.");
+
+    await loadDeposits();
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "정산 삭제에 실패했습니다: " +
+      error.message
+    );
+  }
+}
+  async function editDeposit(id) {
+
+  const newDate =
+    prompt("정산 날짜를 입력하세요. 예: 2026-08-26");
+
+  if (!newDate) {
+    return;
+  }
+
+  const newChannel =
+    prompt(
+      "정산 채널을 입력하세요.\n\n" +
+      "쿠팡이츠 / 배달의민족 / 요기요 / 기타"
+    );
+
+  if (!newChannel) {
+    return;
+  }
+
+  const allowedChannels = [
+    "쿠팡이츠",
+    "배달의민족",
+    "요기요",
+    "기타"
+  ];
+
+  if (!allowedChannels.includes(newChannel)) {
+    alert("올바른 채널을 입력해주세요.");
+    return;
+  }
+
+  const newSalesAmount =
+    prompt("매출액을 입력하세요.");
+
+  if (!newSalesAmount || Number(newSalesAmount) <= 0) {
+    alert("올바른 매출액을 입력해주세요.");
+    return;
+  }
+
+  const newDepositAmount =
+    prompt("최종 정산액을 입력하세요.");
+
+  if (!newDepositAmount || Number(newDepositAmount) <= 0) {
+    alert("올바른 정산액을 입력해주세요.");
+    return;
+  }
+
+  try {
+
+    const { error } = await supabaseClient
+      .from("deposit_details")
+      .update({
+        deposit_date: newDate,
+        channel: newChannel,
+        sales_amount: Number(newSalesAmount),
+        deposit_amount: Number(newDepositAmount)
+      })
+      .eq("id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    alert("정산 내역이 수정되었습니다.");
+
+    await loadDeposits();
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "정산 수정에 실패했습니다: " +
+      error.message
+    );
   }
 }
 // 입력값 변경 시 정산액 자동 계산
