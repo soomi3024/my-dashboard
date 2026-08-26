@@ -250,6 +250,13 @@
     <option value="요기요">요기요</option>
     <option value="기타">기타</option>
   </select>
+  <div id="coupangFeeBox" style="display:none;">
+  <select id="coupangFeeRate">
+    <option value="0.078">쿠팡이츠 중개이용료 7.8%</option>
+    <option value="0.068">쿠팡이츠 중개이용료 6.8%</option>
+    <option value="0.02">쿠팡이츠 중개이용료 2.0%</option>
+  </select>
+</div>
 
   <input type="number" id="salesAmount" placeholder="매출액">
 
@@ -614,12 +621,20 @@ loadDeposits();
   const channel = document.getElementById("depositChannel").value;
   const salesAmount = Number(document.getElementById("salesAmount").value || 0);
 
-  if (channel !== "쿠팡이츠" || salesAmount <= 0) {
-    return;
-  }
+ const feeBox = document.getElementById("coupangFeeBox");
 
-  // 쿠팡이츠 기본 중개이용료 7.8%
-  const brokerageFee = Math.round(salesAmount * 0.078);
+if (feeBox) {
+  feeBox.style.display = channel === "쿠팡이츠" ? "block" : "none";
+if (channel !== "쿠팡이츠" || salesAmount <= 0) {
+  return;
+}
+  // 선택한 쿠팡이츠 중개이용료율 적용
+const feeRate = Number(
+  document.getElementById("coupangFeeRate").value || 0.078
+);
+
+const brokerageFee = Math.round(salesAmount * feeRate);
+
 
   // 결제대행 수수료 3%
   const paymentFee = Math.round(salesAmount * 0.03);
