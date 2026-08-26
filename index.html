@@ -1300,13 +1300,25 @@ async function loadDeposits() {
     totalDeposit.textContent =
       won(depositSum);
 
-    totalFee.textContent =
-      won(feeSum);
-}  //
+   totalFee.textContent =
+  won(feeSum);
+
+  } catch (error) {
+
+    console.error(error);
+
+    depositList.innerHTML =
+      `<p style="color:red;">
+        정산 데이터를 불러오지 못했습니다: ${error.message}
+      </p>`;
+
+    totalDeposit.textContent = "0원";
+    totalFee.textContent = "0원";
+  }
+}
 
 
-
-  loadSales();
+loadSales();
 loadDeposits();
 
 const saleMonthFilter =
