@@ -2,6 +2,10 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
+  
+  <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#222222">
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>더 타코부스 경영관리</title>
 
@@ -2330,5 +2334,18 @@
 
 </script>
 
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js")
+      .then(() => {
+        console.log("앱 설치 기능 활성화");
+      })
+      .catch(error => {
+        console.error("Service Worker 오류:", error);
+      });
+  });
+}
+</script>
 </body>
 </html>
