@@ -2643,12 +2643,19 @@
         const result = await supabaseClient
           .from("deposit_details")
           .update(payload)
-          .eq("id", editingDepositId);
+          .eq("id", Number(editingDepositId))
+          .select("id");
 
         error = result.error;
 
         if (error) {
           throw error;
+        }
+
+        if (!result.data || result.data.length === 0) {
+          throw new Error(
+            "수정된 정산 내역이 없습니다. Supabase의 deposit_details UPDATE 권한(RLS 정책)을 확인해주세요."
+          );
         }
 
         alert("정산 내역이 수정되었습니다.");
@@ -2919,14 +2926,21 @@
 
     try {
 
-      const { error } =
+      const { data: deletedRows, error } =
         await supabaseClient
           .from("deposit_details")
           .delete()
-          .eq("id", id);
+          .eq("id", Number(id))
+          .select("id");
 
       if (error) {
         throw error;
+      }
+
+      if (!deletedRows || deletedRows.length === 0) {
+        throw new Error(
+          "삭제된 정산 내역이 없습니다. Supabase의 deposit_details DELETE 권한(RLS 정책)을 확인해주세요."
+        );
       }
 
       alert("정산 내역이 삭제되었습니다.");
