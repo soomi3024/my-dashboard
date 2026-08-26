@@ -1,0 +1,10 @@
+{
+  "name": "더 타코부스 경영관리",
+  "short_name": "타코부스 관리",
+  "description": "더 타코부스 매출·정산·손익 관리",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#222222",
+  "orientation": "portrait"
+}
