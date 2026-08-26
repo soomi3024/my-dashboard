@@ -619,30 +619,93 @@ loadSales();
 loadDeposits();
   function calculateCoupangFees() {
   const channel = document.getElementById("depositChannel").value;
-  const salesAmount = Number(document.getElementById("salesAmount").value || 0);
+  const salesAmount = Number(
+    document.getElementById("salesAmount").value || 0
+  );
 
- const feeBox = document.getElementById("coupangFeeBox");
+  const feeBox = document.getElementById("coupangFeeBox");
 
-if (feeBox) {
-  feeBox.style.display = channel === "쿠팡이츠" ? "block" : "none";
-if (channel !== "쿠팡이츠" || salesAmount <= 0) {
-  return;
-}
- } 
-  // 선택한 쿠팡이츠 중개이용료율 적용
-const feeRate = Number(
-  document.getElementById("coupangFeeRate").value || 0.078
+  // 쿠팡이츠 수수료 선택창 표시/숨김
+  if (feeBox) {
+    feeBox.style.display =
+      channel === "쿠팡이츠" ? "block" : "none";
+  }
+
+  // 매출이 없으면 계산하지 않음
+  if (salesAmount <= 0) {
+    return;
+  }
+
+  // =========================
+  // 쿠팡이츠
+  // =========================
+  if (channel === "쿠팡이츠") {
+
+    const feeRate = Number(
+      document.getElementById("coupangFeeRate").value || 0.078
+    );
+
+    const brokerageFee = Math.round(
+      salesAmount * feeRate
+    );
+
+    // 결제대행 수수료 3%
+const paymentFee = Math.ceil(
+  salesAmount * 0.014
 );
 
-const brokerageFee = Math.round(salesAmount * feeRate);
+    document.getElementById("brokerageFee").value =
+      brokerageFee;
 
+    document.getElementById("paymentFee").value =
+      paymentFee;
 
-  // 결제대행 수수료 3%
-  const paymentFee = Math.round(salesAmount * 0.03);
+    calculateDeposit();
+    return;
+  }
 
-  document.getElementById("brokerageFee").value = brokerageFee;
-  document.getElementById("paymentFee").value = paymentFee;
+  // =========================
+  // 배달의민족
+  // =========================
+  if (channel === "배달의민족") {
 
+    // 중개이용료 6.8%
+    const brokerageFee = Math.round(
+      salesAmount * 0.068
+    );
+
+    // 결제대행 수수료 1.4%
+    const paymentFee = Math.round(
+      salesAmount * 0.014
+    );
+
+    // 배달비는 정산서에 따라 직접 입력
+    const deliveryFee = Number(
+      document.getElementById("deliveryFee").value || 0
+    );
+
+    // 부가세
+    // 중개이용료 + 결제대행 수수료 + 배달비의 10%
+    const vat = Math.round(
+      (brokerageFee + paymentFee + deliveryFee) * 0.10
+    );
+
+    document.getElementById("brokerageFee").value =
+      brokerageFee;
+
+    document.getElementById("paymentFee").value =
+      paymentFee;
+
+    document.getElementById("vat1").value =
+      vat;
+
+    calculateDeposit();
+    return;
+  }
+
+  // =========================
+  // 홀 / 요기요 / 기타
+  // =========================
   calculateDeposit();
 }
 function calculateDeposit() {
