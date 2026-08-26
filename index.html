@@ -675,9 +675,9 @@ const paymentFee = Math.ceil(
     );
 
     // 결제대행 수수료 1.4%
-    const paymentFee = Math.round(
-      salesAmount * 0.014
-    );
+    const paymentFee = Math.ceil(
+  salesAmount * 0.014
+);
 
     // 배달비는 정산서에 따라 직접 입력
     const deliveryFee = Number(
