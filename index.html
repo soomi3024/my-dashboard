@@ -234,6 +234,65 @@
       <h2>매출 채널별 분석</h2>
 
       <div id="channelList"></div>
+    
+
+    </div>
+
+    <!-- ==============================
+         매출 등록
+         ============================== -->
+
+    <div class="section">
+
+      <h2>매출 등록</h2>
+
+      <div class="deposit-form">
+
+        <h3>매출 입력</h3>
+
+        <div class="form-grid">
+
+          <input
+            type="date"
+            id="saleDate"
+          >
+
+          <select id="saleChannel">
+            <option value="홀">홀</option>
+            <option value="쿠팡이츠">쿠팡이츠</option>
+            <option value="배달의민족">배달의민족</option>
+            <option value="요기요">요기요</option>
+            <option value="식권">식권</option>
+            <option value="식신">식신</option>
+            <option value="네이버 포장">네이버 포장</option>
+            <option value="기타">기타</option>
+          </select>
+
+          <input
+            type="number"
+            id="saleAmount"
+            placeholder="매출액"
+          >
+
+          <input
+            type="text"
+            id="saleMemo"
+            placeholder="메모"
+          >
+
+        </div>
+
+        <button
+          type="button"
+          onclick="saveSale()"
+        >
+          매출 저장
+        </button>
+
+      </div>
+
+    </div>
+
 
   <div class="section">
   <h2>정산 관리</h2>
@@ -713,6 +772,8 @@ if (profitMonthInput) {
       SUPABASE_URL,
       SUPABASE_PUBLISHABLE_KEY
     );
+  
+  loadProfitSales();
 
 
   // ==============================
@@ -1005,7 +1066,64 @@ if (profitMonthInput) {
 
 loadSales();
 loadDeposits();
-loadProfitSales();
+
+  async function saveSale() {
+
+  const saleDate =
+    document.getElementById("saleDate").value;
+
+  const channel =
+    document.getElementById("saleChannel").value;
+
+  const amount =
+    Number(document.getElementById("saleAmount").value || 0);
+
+  const memo =
+    document.getElementById("saleMemo").value;
+
+  if (!saleDate) {
+    alert("매출 날짜를 입력해주세요.");
+    return;
+  }
+
+  if (amount <= 0) {
+    alert("매출액을 입력해주세요.");
+    return;
+  }
+
+  try {
+
+    const { error } = await supabaseClient
+      .from("sales")
+      .insert({
+        sale_date: saleDate,
+        channel: channel,
+        amount: amount,
+        memo: memo
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    alert("매출이 저장되었습니다.");
+
+    document.getElementById("saleAmount").value = "";
+    document.getElementById("saleMemo").value = "";
+
+    await loadSales();
+    await loadProfitSales();
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "매출 저장에 실패했습니다: " +
+      error.message
+    );
+  }
+}
   
   function calculateCoupangFees() {
   const channel = document.getElementById("depositChannel").value;
