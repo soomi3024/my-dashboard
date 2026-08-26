@@ -862,27 +862,44 @@ if (profitMonthInput) {
       const salesList =
         document.getElementById("salesList");
 
-      salesList.innerHTML = "";
+    salesList.innerHTML = "";
 
-      data.slice(0, 20).forEach(row => {
+data.slice(0, 20).forEach(row => {
 
-        const div = document.createElement("div");
+  const div = document.createElement("div");
 
-        div.className = "row";
+  div.className = "row";
 
-        div.innerHTML = `
-          <span>
-            <strong>${row.channel}</strong>
-            <br>
-            <small>${row.sale_date}</small>
-          </span>
+  div.innerHTML = `
+    <span>
+      <strong>${row.channel}</strong>
+      <br>
+      <small>${row.sale_date}</small>
+    </span>
 
-          <strong>${won(row.amount)}</strong>
-        `;
+    <span>
+      <strong>${won(row.amount)}</strong>
+      <br>
+      <button
+        type="button"
+        onclick="editSale(${row.id})"
+        style="margin-top:5px;margin-right:5px;"
+      >
+        수정
+      </button>
 
-        salesList.appendChild(div);
+      <button
+        type="button"
+        onclick="deleteSale(${row.id})"
+      >
+        삭제
+      </button>
+    </span>
+  `;
 
-      });
+  salesList.appendChild(div);
+
+});
 
 
       // ==============================
@@ -1124,7 +1141,114 @@ loadDeposits();
     );
   }
 }
-  
+
+  async function deleteSale(id) {
+
+  if (!confirm("이 매출을 삭제하시겠습니까?")) {
+    return;
+  }
+
+  try {
+
+    const { error } = await supabaseClient
+      .from("sales")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    alert("매출이 삭제되었습니다.");
+
+    await loadSales();
+    await loadProfitSales();
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "매출 삭제에 실패했습니다: " +
+      error.message
+    );
+  }
+}
+
+async function editSale(id) {
+
+  const newDate =
+    prompt("매출 날짜를 입력하세요. 예: 2026-03-18");
+
+  if (!newDate) {
+    return;
+  }
+
+  const newChannel =
+    prompt(
+      "매출 채널을 입력하세요.\n\n" +
+      "홀 / 쿠팡이츠 / 배달의민족 / 요기요 / 식권 / 식신 / 네이버 포장 / 기타"
+    );
+
+  if (!newChannel) {
+    return;
+  }
+
+  const allowedChannels = [
+    "홀",
+    "쿠팡이츠",
+    "배달의민족",
+    "요기요",
+    "식권",
+    "식신",
+    "네이버 포장",
+    "기타"
+  ];
+
+  if (!allowedChannels.includes(newChannel)) {
+    alert("올바른 채널을 입력해주세요.");
+    return;
+  }
+
+  const newAmount =
+    prompt("매출액을 입력하세요.");
+
+  if (!newAmount || Number(newAmount) <= 0) {
+    alert("올바른 매출액을 입력해주세요.");
+    return;
+  }
+
+  try {
+
+    const { error } = await supabaseClient
+      .from("sales")
+      .update({
+        sale_date: newDate,
+        channel: newChannel,
+        amount: Number(newAmount)
+      })
+      .eq("id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    alert("매출이 수정되었습니다.");
+
+    await loadSales();
+    await loadProfitSales();
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "매출 수정에 실패했습니다: " +
+      error.message
+    );
+  }
+}
+
   function calculateCoupangFees() {
   const channel = document.getElementById("depositChannel").value;
   const salesAmount = Number(
