@@ -610,6 +610,25 @@
 
 loadSales();
 loadDeposits();
+  function calculateCoupangFees() {
+  const channel = document.getElementById("depositChannel").value;
+  const salesAmount = Number(document.getElementById("salesAmount").value || 0);
+
+  if (channel !== "쿠팡이츠" || salesAmount <= 0) {
+    return;
+  }
+
+  // 쿠팡이츠 기본 중개이용료 7.8%
+  const brokerageFee = Math.round(salesAmount * 0.078);
+
+  // 결제대행 수수료 3%
+  const paymentFee = Math.round(salesAmount * 0.03);
+
+  document.getElementById("brokerageFee").value = brokerageFee;
+  document.getElementById("paymentFee").value = paymentFee;
+
+  calculateDeposit();
+}
 function calculateDeposit() {
   const salesAmount = Number(document.getElementById("salesAmount").value || 0);
   const brokerageFee = Number(document.getElementById("brokerageFee").value || 0);
@@ -784,6 +803,18 @@ function calculateDeposit() {
     element.addEventListener("change", calculateDeposit);
   }
 });
+// 쿠팡이츠 자동 수수료 계산 연결
+const salesInput = document.getElementById("salesAmount");
+const channelSelect = document.getElementById("depositChannel");
+
+if (salesInput) {
+  salesInput.addEventListener("input", calculateCoupangFees);
+  salesInput.addEventListener("change", calculateCoupangFees);
+}
+
+if (channelSelect) {
+  channelSelect.addEventListener("change", calculateCoupangFees);
+}  
 </script>
 
 </body>
