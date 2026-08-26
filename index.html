@@ -175,9 +175,21 @@
 
       <div id="channelList"></div>
 
-    </div>
+  <div class="section">
+  <h2>정산 관리</h2>
 
+  <div id="depositList"></div>
+
+  <div class="row total">
+    <span>총 입금액</span>
+    <span id="totalDeposit">0원</span>
   </div>
+
+  <div class="row total">
+    <span>총 수수료</span>
+    <span id="totalFee">0원</span>
+  </div>
+</div>
 
 </div>
 
@@ -379,6 +391,67 @@
 
 
   loadSales();
+  async function loadDeposits() {
+  const depositList = document.getElementById("depositList");
+  const totalDeposit = document.getElementById("totalDeposit");
+  const totalFee = document.getElementById("totalFee");
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("deposits")
+      .select("*")
+      .order("deposit_date", { ascending: false })
+      .order("id", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      depositList.innerHTML = "<p>등록된 정산 데이터가 없습니다.</p>";
+      totalDeposit.textContent = "0원";
+      totalFee.textContent = "0원";
+      return;
+    }
+
+    let depositSum = 0;
+    let feeSum = 0;
+
+    depositList.innerHTML = data.map(item => {
+      depositSum += Number(item.deposit_amount || 0);
+      feeSum += Number(item.fee || 0);
+
+      return `
+        <div class="row">
+          <div>
+            <strong>${item.channel}</strong>
+            <div style="font-size:13px;color:#777;">
+              ${item.deposit_date}
+            </div>
+          </div>
+
+          <div style="text-align:right;">
+            <strong>${won(item.deposit_amount)}</strong>
+            <div style="font-size:13px;color:#777;">
+              매출 ${won(item.sales_amount)} · 수수료 ${won(item.fee)}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    totalDeposit.textContent = won(depositSum);
+    totalFee.textContent = won(feeSum);
+
+  } catch (error) {
+    console.error(error);
+    depositList.innerHTML =
+      `<p style="color:red;">정산 데이터를 불러오지 못했습니다: ${error.message}</p>`;
+  }
+}
+
+loadSales();
+loadDeposits();
 
 </script>
 
