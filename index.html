@@ -633,202 +633,9 @@
     
 <script>
 
-  let selectedProfitSales = 0;
-
-async function loadProfitSales() {
-  const month = document.getElementById("profitMonth").value;
-
-  if (!month) {
-    selectedProfitSales = 0;
-    document.getElementById("profitSales").textContent = "0원";
-    calculateMonthlyProfit();
-    return;
-  }
-
-  const startDate = month + "-01";
-
-  const nextMonth = new Date(startDate);
-  nextMonth.setMonth(nextMonth.getMonth() + 1);
-
-  const endDate =
-    nextMonth.getFullYear() +
-    "-" +
-    String(nextMonth.getMonth() + 1).padStart(2, "0") +
-    "-01";
-
-  const { data, error } = await supabaseClient
-    .from("sales")
-    .select("amount")
-    .gte("sale_date", startDate)
-    .lt("sale_date", endDate);
-
-  if (error) {
-    alert("매출 데이터를 불러오지 못했습니다.");
-    console.error(error);
-    return;
-  }
-
-  selectedProfitSales = (data || []).reduce(
-    (sum, row) => sum + Number(row.amount || 0),
-    0
-  );
-
-  document.getElementById("profitSales").textContent =
-    won(selectedProfitSales);
-
-  calculateMonthlyProfit();
-}
-
-function calculateMonthlyProfit() {
-  const sales = selectedProfitSales || 0;
-
-  const logistics =
-    Number(document.getElementById("profitLogistics").value || 0);
-
-  const deliveryFee =
-    Number(document.getElementById("profitDeliveryFee").value || 0);
-
-  const cardFee =
-    Number(document.getElementById("profitCardFee").value || 0);
-
-  const advertising =
-    Number(document.getElementById("profitAdvertising").value || 0);
-
-  const royalty =
-    Math.round(sales * 0.02 * 1.1);
-  
-  document.getElementById("profitRoyaltyBase").value =
-  royalty;
-
-  const gas =
-    Number(document.getElementById("profitGas").value || 0);
-
-  const utility =
-    Number(document.getElementById("profitUtility").value || 0);
-
-  const insurance =
-    Number(document.getElementById("profitInsurance").value || 0);
-
-  const labor =
-    Number(document.getElementById("profitLabor").value || 0);
-
-  const rent =
-    Number(document.getElementById("profitRent").value || 0);
-
-  const torder =
-    Number(document.getElementById("profitTorder").value || 0);
-
-  const pos =
-    Number(document.getElementById("profitPos").value || 0);
-
-  const accountant =
-    Number(document.getElementById("profitTaxAccountant").value || 0);
-
-  const otherFixed =
-    Number(document.getElementById("profitOtherFixed").value || 0);
-
-  const loanInterest =
-    Number(document.getElementById("profitLoanInterest").value || 0);
-
-  const other =
-    Number(document.getElementById("profitOther").value || 0);
-
-  const totalVariable =
-    logistics +
-    deliveryFee +
-    cardFee +
-    advertising +
-    royalty +
-    gas +
-    utility +
-    insurance;
-
-  const totalFixed =
-    labor +
-    rent +
-    torder +
-    pos +
-    accountant +
-    otherFixed;
-
-  const totalFinancial = loanInterest;
-
-  const netProfit =
-    sales -
-    totalVariable -
-    totalFixed -
-    totalFinancial -
-    other;
-
-  const profitRate =
-    sales > 0
-      ? ((netProfit / sales) * 100).toFixed(1)
-      : "0.0";
-
-  document.getElementById("profitSales").textContent =
-    won(sales);
-
-  document.getElementById("profitVariableCost").textContent =
-    won(totalVariable);
-
-  document.getElementById("profitFixedCost").textContent =
-    won(totalFixed);
-
-  document.getElementById("profitFinancialCost").textContent =
-    won(totalFinancial);
-
-  document.getElementById("profitOtherCost").textContent =
-    won(other);
-
-  document.getElementById("profitNet").textContent =
-    won(netProfit);
-
-  document.getElementById("profitRate").textContent =
-    profitRate + "%";
-}
-
-const profitInputIds = [
-  "profitLogistics",
-  "profitDeliveryFee",
-  "profitCardFee",
-  "profitAdvertising",
-  "profitGas",
-  "profitUtility",
-  "profitInsurance",
-  "profitLabor",
-  "profitRent",
-  "profitTorder",
-  "profitPos",
-  "profitTaxAccountant",
-  "profitOtherFixed",
-  "profitLoanInterest",
-  "profitOther"
-];
-
-profitInputIds.forEach(id => {
-  const element = document.getElementById(id);
-
-  if (element) {
-    element.addEventListener("input", calculateMonthlyProfit);
-    element.addEventListener("change", calculateMonthlyProfit);
-  }
-});
-
-const profitMonthInput =
-  document.getElementById("profitMonth");
-
-if (profitMonthInput) {
-  profitMonthInput.addEventListener(
-    "change",
-    loadProfitSales
-  );
-}
-
-  
-
-  // ==============================
-  // Supabase 연결 정보
-  // ==============================
+  // ==========================================
+  // Supabase
+  // ==========================================
 
   const SUPABASE_URL =
     "https://gvlfyzdswegwmmpzoabc.supabase.co";
@@ -841,215 +648,1047 @@ if (profitMonthInput) {
       SUPABASE_URL,
       SUPABASE_PUBLISHABLE_KEY
     );
-  
-  loadProfitSales();
 
 
-  // ==============================
-  // 숫자를 원화로 표시
-  // ==============================
+  // ==========================================
+  // 기본 변수
+  // ==========================================
+
+  let selectedProfitSales = 0;
+
+
+  // ==========================================
+  // 원화 표시
+  // ==========================================
 
   function won(number) {
-    return Number(number).toLocaleString("ko-KR") + "원";
+    return Number(number || 0).toLocaleString("ko-KR") + "원";
   }
 
 
-  // ==============================
-  // 매출 데이터 불러오기
-  // ==============================
+  // ==========================================
+  // 차트 영역 생성
+  // ==========================================
+
+  function createChartAreas() {
+
+    // --------------------------
+    // 매출 채널 원형 그래프
+    // --------------------------
+
+    const channelList =
+      document.getElementById("channelList");
+
+    if (channelList && !document.getElementById("channelPieChart")) {
+
+      channelList.innerHTML = `
+        <div
+          id="channelPieChart"
+          style="
+            width:220px;
+            height:220px;
+            border-radius:50%;
+            margin:20px auto;
+            background:#eee;
+          "
+        ></div>
+
+        <div
+          id="channelLegend"
+          style="
+            display:grid;
+            gap:8px;
+            margin-top:15px;
+          "
+        ></div>
+      `;
+    }
+
+
+    // --------------------------
+    // 손익 원형 그래프
+    // --------------------------
+
+    const profitSummary =
+      document.querySelector(".profit-summary");
+
+    if (
+      profitSummary &&
+      !document.getElementById("profitPieChart")
+    ) {
+
+      const chartBox =
+        document.createElement("div");
+
+      chartBox.innerHTML = `
+        <div
+          id="profitPieChart"
+          style="
+            width:220px;
+            height:220px;
+            border-radius:50%;
+            margin:20px auto;
+            background:#eee;
+          "
+        ></div>
+
+        <div
+          id="profitLegend"
+          style="
+            display:grid;
+            gap:8px;
+            margin:15px 0 25px;
+          "
+        ></div>
+      `;
+
+      profitSummary.prepend(chartBox);
+    }
+  }
+
+
+  // ==========================================
+  // 매출 채널 원형 그래프
+  // ==========================================
+
+  function drawChannelChart(channels, total) {
+
+    createChartAreas();
+
+    const chart =
+      document.getElementById("channelPieChart");
+
+    const legend =
+      document.getElementById("channelLegend");
+
+    if (!chart || !legend) {
+      return;
+    }
+
+    const entries =
+      Object.entries(channels)
+        .sort((a, b) => b[1] - a[1]);
+
+    if (!entries.length || total <= 0) {
+
+      chart.style.background = "#eee";
+
+      legend.innerHTML =
+        "<div>선택한 조건의 매출이 없습니다.</div>";
+
+      return;
+    }
+
+
+    const colors = [
+      "#4CAF50",
+      "#2196F3",
+      "#FF9800",
+      "#9C27B0",
+      "#F44336",
+      "#00BCD4",
+      "#795548",
+      "#607D8B"
+    ];
+
+
+    let current = 0;
+
+    const gradients = [];
+
+    entries.forEach(([channel, amount], index) => {
+
+      const percentage =
+        (amount / total) * 100;
+
+      const start = current;
+      const end = current + percentage;
+
+      gradients.push(
+        `${colors[index % colors.length]} ${start}% ${end}%`
+      );
+
+      current = end;
+
+    });
+
+
+    chart.style.background =
+      `conic-gradient(${gradients.join(",")})`;
+
+
+    legend.innerHTML =
+      entries.map(([channel, amount], index) => {
+
+        const percentage =
+          ((amount / total) * 100).toFixed(1);
+
+        return `
+          <div
+            style="
+              display:flex;
+              justify-content:space-between;
+              align-items:center;
+              font-size:14px;
+            "
+          >
+            <span>
+              <span
+                style="
+                  display:inline-block;
+                  width:10px;
+                  height:10px;
+                  border-radius:50%;
+                  background:${colors[index % colors.length]};
+                  margin-right:6px;
+                "
+              ></span>
+
+              ${channel}
+            </span>
+
+            <strong>
+              ${won(amount)}
+              (${percentage}%)
+            </strong>
+          </div>
+        `;
+
+      }).join("");
+  }
+
+
+  // ==========================================
+  // 손익 원형 그래프
+  // ==========================================
+
+  function drawProfitChart(
+    variableCost,
+    fixedCost,
+    financialCost,
+    otherCost,
+    netProfit
+  ) {
+
+    createChartAreas();
+
+    const chart =
+      document.getElementById("profitPieChart");
+
+    const legend =
+      document.getElementById("profitLegend");
+
+    if (!chart || !legend) {
+      return;
+    }
+
+
+    const items = [
+      ["변동비", variableCost, "#FF9800"],
+      ["고정비", fixedCost, "#2196F3"],
+      ["금융비용", financialCost, "#9C27B0"],
+      ["기타비용", otherCost, "#F44336"]
+    ];
+
+
+    if (netProfit > 0) {
+      items.push(
+        ["순이익", netProfit, "#4CAF50"]
+      );
+    }
+
+
+    const validItems =
+      items.filter(item => item[1] > 0);
+
+    const total =
+      validItems.reduce(
+        (sum, item) => sum + item[1],
+        0
+      );
+
+
+    if (total <= 0) {
+
+      chart.style.background = "#eee";
+
+      legend.innerHTML =
+        "<div>입력된 손익 데이터가 없습니다.</div>";
+
+      return;
+    }
+
+
+    let current = 0;
+    const gradients = [];
+
+
+    validItems.forEach(item => {
+
+      const percentage =
+        (item[1] / total) * 100;
+
+      const start = current;
+      const end = current + percentage;
+
+      gradients.push(
+        `${item[2]} ${start}% ${end}%`
+      );
+
+      current = end;
+
+    });
+
+
+    chart.style.background =
+      `conic-gradient(${gradients.join(",")})`;
+
+
+    legend.innerHTML =
+      validItems.map(item => {
+
+        const percentage =
+          ((item[1] / total) * 100).toFixed(1);
+
+        return `
+          <div
+            style="
+              display:flex;
+              justify-content:space-between;
+              font-size:14px;
+            "
+          >
+            <span>
+              <span
+                style="
+                  display:inline-block;
+                  width:10px;
+                  height:10px;
+                  border-radius:50%;
+                  background:${item[2]};
+                  margin-right:6px;
+                "
+              ></span>
+
+              ${item[0]}
+            </span>
+
+            <strong>
+              ${won(item[1])}
+              (${percentage}%)
+            </strong>
+          </div>
+        `;
+
+      }).join("");
+
+
+    if (netProfit < 0) {
+
+      legend.innerHTML += `
+        <div
+          style="
+            margin-top:8px;
+            padding:10px;
+            border-radius:8px;
+            background:#fff0f0;
+            color:#c62828;
+            font-weight:bold;
+          "
+        >
+          현재 순손실 ${won(Math.abs(netProfit))}
+        </div>
+      `;
+
+    }
+  }
+
+
+  // ==========================================
+  // 월별 손익관리
+  // ==========================================
+
+  async function loadProfitSales() {
+
+    const monthInput =
+      document.getElementById("profitMonth");
+
+    if (!monthInput) {
+      return;
+    }
+
+    const month =
+      monthInput.value;
+
+
+    if (!month) {
+
+      selectedProfitSales = 0;
+
+      document.getElementById(
+        "profitSales"
+      ).textContent = "0원";
+
+      calculateMonthlyProfit();
+
+      return;
+    }
+
+
+    const startDate =
+      month + "-01";
+
+    const nextMonth =
+      new Date(startDate);
+
+    nextMonth.setMonth(
+      nextMonth.getMonth() + 1
+    );
+
+
+    const endDate =
+      nextMonth.getFullYear() +
+      "-" +
+      String(
+        nextMonth.getMonth() + 1
+      ).padStart(2, "0") +
+      "-01";
+
+
+    const {
+      data,
+      error
+    } = await supabaseClient
+      .from("sales")
+      .select("amount")
+      .gte("sale_date", startDate)
+      .lt("sale_date", endDate);
+
+
+    if (error) {
+
+      console.error(error);
+
+      alert(
+        "매출 데이터를 불러오지 못했습니다: " +
+        error.message
+      );
+
+      return;
+    }
+
+
+    selectedProfitSales =
+      (data || []).reduce(
+        (sum, row) =>
+          sum + Number(row.amount || 0),
+        0
+      );
+
+
+    document.getElementById(
+      "profitSales"
+    ).textContent =
+      won(selectedProfitSales);
+
+
+    calculateMonthlyProfit();
+  }
+
+
+  // ==========================================
+  // 손익 계산
+  // ==========================================
+
+  function calculateMonthlyProfit() {
+
+    const sales =
+      selectedProfitSales || 0;
+
+
+    const logistics =
+      Number(
+        document.getElementById(
+          "profitLogistics"
+        ).value || 0
+      );
+
+    const deliveryFee =
+      Number(
+        document.getElementById(
+          "profitDeliveryFee"
+        ).value || 0
+      );
+
+    const cardFee =
+      Number(
+        document.getElementById(
+          "profitCardFee"
+        ).value || 0
+      );
+
+    const advertising =
+      Number(
+        document.getElementById(
+          "profitAdvertising"
+        ).value || 0
+      );
+
+
+    // 로열티 = 월매출 2% + 부가세 10%
+    const royalty =
+      Math.round(
+        sales * 0.02 * 1.1
+      );
+
+
+    document.getElementById(
+      "profitRoyaltyBase"
+    ).value =
+      royalty;
+
+
+    const gas =
+      Number(
+        document.getElementById(
+          "profitGas"
+        ).value || 0
+      );
+
+    const utility =
+      Number(
+        document.getElementById(
+          "profitUtility"
+        ).value || 0
+      );
+
+    const insurance =
+      Number(
+        document.getElementById(
+          "profitInsurance"
+        ).value || 0
+      );
+
+
+    const labor =
+      Number(
+        document.getElementById(
+          "profitLabor"
+        ).value || 0
+      );
+
+    const rent =
+      Number(
+        document.getElementById(
+          "profitRent"
+        ).value || 0
+      );
+
+    const torder =
+      Number(
+        document.getElementById(
+          "profitTorder"
+        ).value || 0
+      );
+
+    const pos =
+      Number(
+        document.getElementById(
+          "profitPos"
+        ).value || 0
+      );
+
+    const accountant =
+      Number(
+        document.getElementById(
+          "profitTaxAccountant"
+        ).value || 0
+      );
+
+    const otherFixed =
+      Number(
+        document.getElementById(
+          "profitOtherFixed"
+        ).value || 0
+      );
+
+
+    const loanInterest =
+      Number(
+        document.getElementById(
+          "profitLoanInterest"
+        ).value || 0
+      );
+
+    const other =
+      Number(
+        document.getElementById(
+          "profitOther"
+        ).value || 0
+      );
+
+
+    const totalVariable =
+      logistics +
+      deliveryFee +
+      cardFee +
+      advertising +
+      royalty +
+      gas +
+      utility +
+      insurance;
+
+
+    const totalFixed =
+      labor +
+      rent +
+      torder +
+      pos +
+      accountant +
+      otherFixed;
+
+
+    const totalFinancial =
+      loanInterest;
+
+
+    const netProfit =
+      sales -
+      totalVariable -
+      totalFixed -
+      totalFinancial -
+      other;
+
+
+    const profitRate =
+      sales > 0
+        ? (
+            (netProfit / sales) *
+            100
+          ).toFixed(1)
+        : "0.0";
+
+
+    document.getElementById(
+      "profitSales"
+    ).textContent =
+      won(sales);
+
+
+    document.getElementById(
+      "profitVariableCost"
+    ).textContent =
+      won(totalVariable);
+
+
+    document.getElementById(
+      "profitFixedCost"
+    ).textContent =
+      won(totalFixed);
+
+
+    document.getElementById(
+      "profitFinancialCost"
+    ).textContent =
+      won(totalFinancial);
+
+
+    document.getElementById(
+      "profitOtherCost"
+    ).textContent =
+      won(other);
+
+
+    document.getElementById(
+      "profitNet"
+    ).textContent =
+      won(netProfit);
+
+
+    document.getElementById(
+      "profitRate"
+    ).textContent =
+      profitRate + "%";
+
+
+    drawProfitChart(
+      totalVariable,
+      totalFixed,
+      totalFinancial,
+      other,
+      netProfit
+    );
+  }
+
+
+  // ==========================================
+  // 월별 손익 저장
+  // ==========================================
+
+  function getMonthlyProfitFormData() {
+    return {
+      profitLogistics: document.getElementById("profitLogistics")?.value || "",
+      profitDeliveryFee: document.getElementById("profitDeliveryFee")?.value || "",
+      profitCardFee: document.getElementById("profitCardFee")?.value || "",
+      profitAdvertising: document.getElementById("profitAdvertising")?.value || "",
+      profitGas: document.getElementById("profitGas")?.value || "",
+      profitUtility: document.getElementById("profitUtility")?.value || "",
+      profitInsurance: document.getElementById("profitInsurance")?.value || "",
+      profitLabor: document.getElementById("profitLabor")?.value || "",
+      profitRent: document.getElementById("profitRent")?.value || "",
+      profitTorder: document.getElementById("profitTorder")?.value || "",
+      profitPos: document.getElementById("profitPos")?.value || "",
+      profitTaxAccountant: document.getElementById("profitTaxAccountant")?.value || "",
+      profitOtherFixed: document.getElementById("profitOtherFixed")?.value || "",
+      profitLoanInterest: document.getElementById("profitLoanInterest")?.value || "",
+      profitOther: document.getElementById("profitOther")?.value || "",
+      profitMemo: document.getElementById("profitMemo")?.value || ""
+    };
+  }
+
+  function applyMonthlyProfitFormData(data) {
+    if (!data) return;
+
+    Object.entries(data).forEach(([id, value]) => {
+      const element = document.getElementById(id);
+      if (element) element.value = value ?? "";
+    });
+
+    calculateMonthlyProfit();
+  }
+
+  function loadSavedMonthlyProfit() {
+    const month = document.getElementById("profitMonth")?.value;
+    if (!month) return;
+
+    try {
+      const saved = localStorage.getItem("tacobooth_monthly_profit_" + month);
+      if (saved) {
+        applyMonthlyProfitFormData(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error("월별 손익 불러오기 실패", error);
+    }
+  }
+
+  function saveMonthlyProfit() {
+    const month = document.getElementById("profitMonth")?.value;
+
+    if (!month) {
+      alert("저장할 월을 먼저 선택해주세요.");
+      return;
+    }
+
+    try {
+      const data = getMonthlyProfitFormData();
+      localStorage.setItem(
+        "tacobooth_monthly_profit_" + month,
+        JSON.stringify(data)
+      );
+
+      calculateMonthlyProfit();
+      alert(month + " 손익 데이터가 저장되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("손익 저장에 실패했습니다: " + error.message);
+    }
+  }
+
+
+  // ==========================================
+  // 손익 입력 자동 계산
+  // ==========================================
+
+  const profitInputIds = [
+    "profitLogistics",
+    "profitDeliveryFee",
+    "profitCardFee",
+    "profitAdvertising",
+    "profitGas",
+    "profitUtility",
+    "profitInsurance",
+    "profitLabor",
+    "profitRent",
+    "profitTorder",
+    "profitPos",
+    "profitTaxAccountant",
+    "profitOtherFixed",
+    "profitLoanInterest",
+    "profitOther"
+  ];
+
+
+  profitInputIds.forEach(id => {
+
+    const element =
+      document.getElementById(id);
+
+    if (element) {
+
+      element.addEventListener(
+        "input",
+        calculateMonthlyProfit
+      );
+
+      element.addEventListener(
+        "change",
+        calculateMonthlyProfit
+      );
+
+    }
+
+  });
+
+
+  // ==========================================
+  // 매출 불러오기
+  // ==========================================
 
   async function loadSales() {
 
-    const loading = document.getElementById("loading");
-    const errorBox = document.getElementById("error");
-    const dashboard = document.getElementById("dashboard");
+    const loading =
+      document.getElementById("loading");
+
+    const errorBox =
+      document.getElementById("error");
+
+    const dashboard =
+      document.getElementById("dashboard");
+
 
     try {
 
-      const { data, error } = await supabaseClient
+      const {
+        data,
+        error
+      } = await supabaseClient
         .from("sales")
         .select("*")
-        .order("sale_date", { ascending: false })
-        .order("id", { ascending: false });
+        .order(
+          "sale_date",
+          { ascending:false }
+        )
+        .order(
+          "id",
+          { ascending:false }
+        );
+
 
       if (error) {
         throw error;
       }
 
-      if (!data || data.length === 0) {
-        throw new Error("등록된 매출 데이터가 없습니다.");
+
+      const saleMonthFilter =
+        document.getElementById(
+          "saleMonthFilter"
+        )?.value || "";
+
+
+      const saleDateFilter =
+        document.getElementById(
+          "saleDateFilter"
+        )?.value || "";
+
+
+      let filteredSales =
+        data || [];
+
+
+      if (saleMonthFilter) {
+
+        filteredSales =
+          filteredSales.filter(
+            row =>
+              row.sale_date &&
+              row.sale_date.startsWith(
+                saleMonthFilter
+              )
+          );
+
       }
 
 
-      // ==============================
-      // 전체 매출
-      // ==============================
+      if (saleDateFilter) {
 
-     const saleMonthFilter =
-  document.getElementById("saleMonthFilter").value;
+        filteredSales =
+          filteredSales.filter(
+            row =>
+              row.sale_date ===
+              saleDateFilter
+          );
 
-const saleDateFilter =
-  document.getElementById("saleDateFilter").value;
-
-let filteredSales = data || [];
-
-if (saleMonthFilter) {
-  filteredSales = filteredSales.filter(row =>
-    row.sale_date &&
-    row.sale_date.startsWith(saleMonthFilter)
-  );
-}
-
-if (saleDateFilter) {
-  filteredSales = filteredSales.filter(row =>
-    row.sale_date === saleDateFilter
-  );
-}
-      const total = filteredSales.reduce(
-  (sum, row) => sum + Number(row.amount),
-  0
-);
+      }
 
 
-      // ==============================
-      // 오늘 매출
-      // ==============================
-
-      const today = new Date()
-        .toISOString()
-        .split("T")[0];
-
-      const todayTotal = data
-        .filter(row => row.sale_date === today)
-        .reduce(
-          (sum, row) => sum + Number(row.amount),
+      const total =
+        filteredSales.reduce(
+          (sum, row) =>
+            sum + Number(row.amount || 0),
           0
         );
 
 
-      // ==============================
-      // 화면 숫자 표시
-      // ==============================
+      const today =
+        new Date()
+          .toISOString()
+          .split("T")[0];
 
-      document.getElementById("todaySales").textContent =
+
+      const todayTotal =
+        (data || [])
+          .filter(
+            row =>
+              row.sale_date === today
+          )
+          .reduce(
+            (sum, row) =>
+              sum + Number(row.amount || 0),
+            0
+          );
+
+
+      document.getElementById(
+        "todaySales"
+      ).textContent =
         won(todayTotal);
 
-      document.getElementById("monthlySales").textContent =
+
+      document.getElementById(
+        "monthlySales"
+      ).textContent =
         won(total);
 
-      document.getElementById("totalSales").textContent =
+
+      document.getElementById(
+        "totalSales"
+      ).textContent =
         won(total);
 
-     document.getElementById("salesCount").textContent =
-  filteredSales.length + "건";
 
+      document.getElementById(
+        "salesCount"
+      ).textContent =
+        filteredSales.length + "건";
 
-      // ==============================
-      // 최근 매출
-      // ==============================
 
       const salesList =
-        document.getElementById("salesList");
-
-    salesList.innerHTML = "";
-
-filteredSales.slice(0, 20).forEach(row => {
-
-  const div = document.createElement("div");
-
-  div.className = "row";
-
-  div.innerHTML = `
-    <span>
-      <strong>${row.channel}</strong>
-      <br>
-      <small>${row.sale_date}</small>
-    </span>
-
-    <span>
-      <strong>${won(row.amount)}</strong>
-      <br>
-      <button
-        type="button"
-        onclick="editSale(${row.id})"
-        style="margin-top:5px;margin-right:5px;"
-      >
-        수정
-      </button>
-
-      <button
-        type="button"
-        onclick="deleteSale(${row.id})"
-      >
-        삭제
-      </button>
-    </span>
-  `;
-
-  salesList.appendChild(div);
-
-});
+        document.getElementById(
+          "salesList"
+        );
 
 
-      // ==============================
-      // 채널별 매출
-      // ==============================
+      salesList.innerHTML = "";
+
+
+      if (!filteredSales.length) {
+
+        salesList.innerHTML =
+          "<p>선택한 조건의 매출이 없습니다.</p>";
+
+      } else {
+
+        filteredSales
+          .slice(0, 50)
+          .forEach(row => {
+
+            const div =
+              document.createElement("div");
+
+            div.className = "row";
+
+
+            div.innerHTML = `
+              <span>
+                <strong>
+                  ${row.channel}
+                </strong>
+
+                <br>
+
+                <small>
+                  ${row.sale_date}
+                </small>
+              </span>
+
+              <span>
+
+                <strong>
+                  ${won(row.amount)}
+                </strong>
+
+                <br>
+
+                <button
+                  type="button"
+                  onclick="editSale(${row.id})"
+                  style="
+                    margin-top:5px;
+                    margin-right:5px;
+                  "
+                >
+                  수정
+                </button>
+
+                <button
+                  type="button"
+                  onclick="deleteSale(${row.id})"
+                >
+                  삭제
+                </button>
+
+              </span>
+            `;
+
+
+            salesList.appendChild(div);
+
+          });
+
+      }
+
+
+      // --------------------------
+      // 채널별 집계
+      // --------------------------
 
       const channels = {};
 
-    filteredSales.forEach(row => {
+
+      filteredSales.forEach(row => {
 
         if (!channels[row.channel]) {
           channels[row.channel] = 0;
         }
 
-        channels[row.channel] += Number(row.amount);
+        channels[row.channel] +=
+          Number(row.amount || 0);
 
       });
 
 
-      const channelList =
-        document.getElementById("channelList");
-
-      channelList.innerHTML = "";
-
-      Object.entries(channels)
-        .sort((a, b) => b[1] - a[1])
-        .forEach(([channel, amount]) => {
-
-          const percentage =
-            total > 0
-              ? ((amount / total) * 100).toFixed(1)
-              : 0;
-
-          const div =
-            document.createElement("div");
-
-          div.className = "row";
-
-          div.innerHTML = `
-            <span>${channel}</span>
-            <strong>
-              ${won(amount)}
-              (${percentage}%)
-            </strong>
-          `;
-
-          channelList.appendChild(div);
-
-        });
+      drawChannelChart(
+        channels,
+        total
+      );
 
 
-      loading.style.display = "none";
-      dashboard.style.display = "block";
+      loading.style.display =
+        "none";
+
+      dashboard.style.display =
+        "block";
+
 
     } catch (error) {
 
       console.error(error);
 
-      loading.style.display = "none";
+      loading.style.display =
+        "none";
 
-      errorBox.style.display = "block";
+      errorBox.style.display =
+        "block";
 
       errorBox.textContent =
         "매출 데이터를 불러오지 못했습니다: " +
@@ -1060,834 +1699,1571 @@ filteredSales.slice(0, 20).forEach(row => {
   }
 
 
-  loadSales();
-async function loadDeposits() {
+  // ==========================================
+  // 매출 저장
+  // ==========================================
 
-  const depositList =
-    document.getElementById("depositList");
+  async function saveSale() {
 
-  const totalDeposit =
-    document.getElementById("totalDeposit");
+    const saleDate =
+      document.getElementById("saleDate").value;
 
-  const totalFee =
-    document.getElementById("totalFee");
+    const channel =
+      document.getElementById("saleChannel").value;
 
-  const monthFilter =
-    document.getElementById("depositMonthFilter").value;
+    const amount =
+      Number(document.getElementById("saleAmount").value || 0);
 
-  const dateFilter =
-    document.getElementById("depositDateFilter").value;
+    const memo =
+      document.getElementById("saleMemo").value;
 
-  try {
-
-    const { data, error } =
-      await supabaseClient
-        .from("deposit_details")
-        .select("*")
-        .order("deposit_date", { ascending: false })
-        .order("id", { ascending: false });
-
-    if (error) {
-      throw error;
+    if (!saleDate) {
+      alert("매출 날짜를 입력해주세요.");
+      return;
     }
 
-    let filteredData = data || [];
+    if (amount <= 0) {
+      alert("매출액을 입력해주세요.");
+      return;
+    }
 
-    // =========================
-    // 월 필터
-    // =========================
+    try {
 
-    if (monthFilter) {
+      const { error } =
+        await supabaseClient
+          .from("sales")
+          .insert({
+            sale_date: saleDate,
+            channel: channel,
+            amount: amount,
+            memo: memo
+          });
 
-      filteredData =
-        filteredData.filter(item =>
-          item.deposit_date &&
-          item.deposit_date.startsWith(monthFilter)
+      if (error) {
+        throw error;
+      }
+
+      alert("매출이 저장되었습니다.");
+
+      document.getElementById("saleAmount").value = "";
+      document.getElementById("saleMemo").value = "";
+
+      await loadSales();
+      await loadProfitSales();
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "매출 저장에 실패했습니다: " +
+        error.message
+      );
+
+    }
+
+  }
+
+
+  // ==========================================
+  // 매출 수정
+  // ==========================================
+
+  async function editSale(id) {
+
+    try {
+
+      const {
+        data: sale,
+        error: fetchError
+      } =
+        await supabaseClient
+          .from("sales")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+
+      const newDate =
+        prompt(
+          "매출 날짜를 수정하세요.",
+          sale.sale_date
         );
 
-    }
 
-    // =========================
-    // 날짜 필터
-    // =========================
+      if (!newDate) {
+        return;
+      }
 
-    if (dateFilter) {
 
-      filteredData =
-        filteredData.filter(item =>
-          item.deposit_date === dateFilter
+      const allowedChannels = [
+        "홀",
+        "쿠팡이츠",
+        "배달의민족",
+        "요기요",
+        "식권",
+        "식신",
+        "네이버 포장",
+        "기타"
+      ];
+
+
+      const newChannel =
+        prompt(
+          "매출 채널을 수정하세요.\n\n" +
+          "홀 / 쿠팡이츠 / 배달의민족 / 요기요 / 식권 / 식신 / 네이버 포장 / 기타",
+          sale.channel
         );
 
+
+      if (!newChannel) {
+        return;
+      }
+
+
+      if (
+        !allowedChannels.includes(
+          newChannel
+        )
+      ) {
+
+        alert(
+          "올바른 채널을 입력해주세요."
+        );
+
+        return;
+      }
+
+
+      const newAmount =
+        prompt(
+          "매출액을 수정하세요.",
+          sale.amount
+        );
+
+
+      if (
+        !newAmount ||
+        Number(newAmount) <= 0
+      ) {
+
+        alert(
+          "올바른 매출액을 입력해주세요."
+        );
+
+        return;
+      }
+
+
+      const {
+        data: updatedSale,
+        error: updateError
+      } =
+        await supabaseClient
+          .from("sales")
+          .update({
+            sale_date: newDate,
+            channel: newChannel,
+            amount: Number(newAmount)
+          })
+          .eq("id", id)
+          .select()
+          .single();
+
+
+      if (updateError) {
+        throw updateError;
+      }
+
+
+      if (!updatedSale) {
+
+        alert(
+          "수정된 매출을 확인하지 못했습니다."
+        );
+
+        return;
+      }
+
+
+      alert(
+        "매출이 수정되었습니다.\n\n" +
+        "날짜: " + updatedSale.sale_date + "\n" +
+        "채널: " + updatedSale.channel + "\n" +
+        "매출: " + won(updatedSale.amount)
+      );
+
+
+      await loadSales();
+      await loadProfitSales();
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "매출 수정에 실패했습니다: " +
+        error.message
+      );
+
     }
 
-    // =========================
-    // 데이터 없음
-    // =========================
+  }
 
-    if (filteredData.length === 0) {
 
-      depositList.innerHTML =
-        "<p>선택한 조건의 정산 데이터가 없습니다.</p>";
+  // ==========================================
+  // 매출 삭제
+  // ==========================================
 
-      totalDeposit.textContent = "0원";
-      totalFee.textContent = "0원";
+  async function deleteSale(id) {
+
+    if (
+      !confirm(
+        "이 매출을 삭제하시겠습니까?"
+      )
+    ) {
+      return;
+    }
+
+
+    try {
+
+      const {
+        data: deletedSale,
+        error
+      } =
+        await supabaseClient
+          .from("sales")
+          .delete()
+          .eq("id", id)
+          .select()
+          .single();
+
+
+      if (error) {
+        throw error;
+      }
+
+
+      if (!deletedSale) {
+
+        alert(
+          "삭제된 매출을 확인하지 못했습니다."
+        );
+
+        return;
+      }
+
+
+      alert(
+        "매출이 삭제되었습니다."
+      );
+
+
+      await loadSales();
+      await loadProfitSales();
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "매출 삭제에 실패했습니다: " +
+        error.message
+      );
+
+    }
+
+  }
+
+
+  // ==========================================
+  // 쿠팡이츠 / 배민 수수료 자동 계산
+  // ==========================================
+
+  function calculateCoupangFees() {
+
+    const channel =
+      document.getElementById(
+        "depositChannel"
+      ).value;
+
+
+    const salesAmount =
+      Number(
+        document.getElementById(
+          "salesAmount"
+        ).value || 0
+      );
+
+
+    const feeBox =
+      document.getElementById(
+        "coupangFeeBox"
+      );
+
+
+    if (feeBox) {
+
+      feeBox.style.display =
+        channel === "쿠팡이츠"
+          ? "block"
+          : "none";
+
+    }
+
+
+    if (salesAmount <= 0) {
+      return;
+    }
+
+
+    // 쿠팡이츠
+    if (
+      channel ===
+      "쿠팡이츠"
+    ) {
+
+      const feeRate =
+        Number(
+          document.getElementById(
+            "coupangFeeRate"
+          ).value || 0.078
+        );
+
+
+      const brokerageFee =
+        Math.round(
+          salesAmount * feeRate
+        );
+
+
+      // 결제대행 수수료 3%
+      const paymentFee =
+        Math.ceil(
+          salesAmount * 0.03
+        );
+
+
+      document.getElementById(
+        "brokerageFee"
+      ).value =
+        brokerageFee;
+
+
+      document.getElementById(
+        "paymentFee"
+      ).value =
+        paymentFee;
+
+
+      calculateDeposit();
 
       return;
     }
 
-    let depositSum = 0;
-    let feeSum = 0;
 
-    // =========================
-    // 정산 목록
-    // =========================
+    // 배달의민족
+    if (
+      channel ===
+      "배달의민족"
+    ) {
 
-    depositList.innerHTML =
-      filteredData.map(item => {
-
-        const totalDeductions =
-          Number(item.brokerage_fee || 0) +
-          Number(item.delivery_fee || 0) +
-          Number(item.coupon_discount || 0) +
-          Number(item.instant_discount || 0) +
-          Number(item.advertising_fee || 0) +
-          Number(item.payment_fee || 0) +
-          Number(item.vat || 0);
-
-        const adjustments =
-          Number(item.fee_adjustment || 0) +
-          Number(item.vat_adjustment || 0);
-
-        const actualFee =
-          totalDeductions - adjustments;
-
-        depositSum +=
-          Number(item.deposit_amount || 0);
-
-        feeSum += actualFee;
-
-        const settlementRate =
-          Number(item.sales_amount || 0) > 0
-            ? (
-                Number(item.deposit_amount || 0) /
-                Number(item.sales_amount || 0) *
-                100
-              ).toFixed(1)
-            : "0.0";
-
-        return `
-          <div
-            class="row"
-            style="
-              padding:18px 0;
-              border-bottom:1px solid #eee;
-            "
-          >
-
-            <div>
-
-              <strong>
-               ${item.channel}
-              </strong>
-              
-              <div style="margin-top:8px;">
-
-  <button
-    type="button"
-    onclick="editDeposit(${item.id})"
-    style="margin-right:5px;"
-  >
-    수정
-  </button>
-
-  <button
-    type="button"
-    onclick="deleteDeposit(${item.id})"
-  >
-    삭제
-  </button>
-
-</div>
-
-              <div
-                style="
-                  font-size:13px;
-                  color:#777;
-                "
-              >
-                ${item.deposit_date}
-              </div>
-
-              <div
-                style="
-                  margin-top:10px;
-                  font-size:13px;
-                  line-height:1.8;
-                  color:#555;
-                "
-              >
-
-                매출 ${won(item.sales_amount)} ·
-                중개 ${won(item.brokerage_fee)} ·
-                배달비 ${won(item.delivery_fee)}
-                <br>
-
-                쿠폰 ${won(item.coupon_discount)} ·
-                즉시할인 ${won(item.instant_discount)} ·
-                광고비 ${won(item.advertising_fee)}
-                <br>
-
-                결제수수료 ${won(item.payment_fee)} ·
-                부가세 ${won(item.vat)}
-                <br>
-
-                수수료 보정 ${won(item.fee_adjustment)} ·
-                부가세 보정 ${won(item.vat_adjustment)}
-
-              </div>
-
-            </div>
-
-            <div
-              style="
-                text-align:right;
-                margin-top:10px;
-              "
-            >
-
-              <strong>
-                ${won(item.deposit_amount)}
-              </strong>
-
-              <div
-                style="
-                  font-size:13px;
-                  color:#777;
-                "
-              >
-                매출 ${won(item.sales_amount)}
-              </div>
-
-              <div
-                style="
-                  font-size:13px;
-                  color:#777;
-                "
-              >
-                실제 정산율 ${settlementRate}%
-              </div>
-
-              <div
-                style="
-                  font-size:13px;
-                  color:#777;
-                "
-              >
-                실제 차감액 ${won(actualFee)}
-              </div>
-
-            </div>
-
-          </div>
-        `;
-
-      }).join("");
-
-    // =========================
-    // 합계
-    // =========================
-
-    totalDeposit.textContent =
-      won(depositSum);
-
-   totalFee.textContent =
-  won(feeSum);
-
-  } catch (error) {
-
-    console.error(error);
-
-    depositList.innerHTML =
-      `<p style="color:red;">
-        정산 데이터를 불러오지 못했습니다: ${error.message}
-      </p>`;
-
-    totalDeposit.textContent = "0원";
-    totalFee.textContent = "0원";
-  }
-}
+      const brokerageFee =
+        Math.round(
+          salesAmount * 0.068
+        );
 
 
-loadSales();
-loadDeposits();
+      // 결제대행 수수료 1.4%
+      const paymentFee =
+        Math.ceil(
+          salesAmount * 0.014
+        );
 
-const saleMonthFilter =
-  document.getElementById("saleMonthFilter");
 
-const saleDateFilter =
-  document.getElementById("saleDateFilter");
+      const deliveryFee =
+        Number(
+          document.getElementById(
+            "deliveryFee"
+          ).value || 0
+        );
 
-if (saleMonthFilter) {
-  saleMonthFilter.addEventListener(
-    "change",
-    loadSales
-  );
-}
 
-if (saleDateFilter) {
-  saleDateFilter.addEventListener(
-    "change",
-    loadSales
-  );
-}
+      const vat =
+        Math.round(
+          (
+            brokerageFee +
+            paymentFee +
+            deliveryFee
+          ) * 0.10
+        );
 
-function clearSaleFilter() {
 
-  saleMonthFilter.value = "";
-  saleDateFilter.value = "";
+      document.getElementById(
+        "brokerageFee"
+      ).value =
+        brokerageFee;
 
-  loadSales();
-}
 
-const depositMonthFilter =
-  document.getElementById("depositMonthFilter");
+      document.getElementById(
+        "paymentFee"
+      ).value =
+        paymentFee;
 
-const depositDateFilter =
-  document.getElementById("depositDateFilter");
 
-if (depositMonthFilter) {
-  depositMonthFilter.addEventListener(
-    "change",
-    loadDeposits
-  );
-}
+      document.getElementById(
+        "vat1"
+      ).value =
+        vat;
 
-if (depositDateFilter) {
-  depositDateFilter.addEventListener(
-    "change",
-    loadDeposits
-  );
-}
 
-function clearDepositFilter() {
-  depositMonthFilter.value = "";
-  depositDateFilter.value = "";
-  loadDeposits();
-}
+      calculateDeposit();
 
-async function saveSale() {
-
-  const saleDate =
-    document.getElementById("saleDate").value;
-
-  const channel =
-    document.getElementById("saleChannel").value;
-
-  const amount =
-    Number(document.getElementById("saleAmount").value || 0);
-
-  const memo =
-    document.getElementById("saleMemo").value;
-
-  if (!saleDate) {
-    alert("매출 날짜를 입력해주세요.");
-    return;
-  }
-
-  if (amount <= 0) {
-    alert("매출액을 입력해주세요.");
-    return;
-  }
-
-  try {
-
-    const { error } = await supabaseClient
-      .from("sales")
-      .insert({
-        sale_date: saleDate,
-        channel: channel,
-        amount: amount,
-        memo: memo
-      });
-
-    if (error) {
-      throw error;
+      return;
     }
 
-    alert("매출이 저장되었습니다.");
-
-    document.getElementById("saleAmount").value = "";
-    document.getElementById("saleMemo").value = "";
-
-    await loadSales();
-    await loadProfitSales();
-
-  } catch (error) {
-
-    console.error(error);
-
-    alert(
-      "매출 저장에 실패했습니다: " +
-      error.message
-    );
-  }
-}
-
-  async function deleteSale(id) {
-
-  if (!confirm("이 매출을 삭제하시겠습니까?")) {
-    return;
-  }
-
-  try {
-
-    const { error } = await supabaseClient
-      .from("sales")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      throw error;
-    }
-
-    alert("매출이 삭제되었습니다.");
-
-    await loadSales();
-    await loadProfitSales();
-
-  } catch (error) {
-
-    console.error(error);
-
-    alert(
-      "매출 삭제에 실패했습니다: " +
-      error.message
-    );
-  }
-}
-
-async function editSale(id) {
-
-  const newDate =
-    prompt("매출 날짜를 입력하세요. 예: 2026-03-18");
-
-  if (!newDate) {
-    return;
-  }
-
-  const newChannel =
-    prompt(
-      "매출 채널을 입력하세요.\n\n" +
-      "홀 / 쿠팡이츠 / 배달의민족 / 요기요 / 식권 / 식신 / 네이버 포장 / 기타"
-    );
-
-  if (!newChannel) {
-    return;
-  }
-
-  const allowedChannels = [
-    "홀",
-    "쿠팡이츠",
-    "배달의민족",
-    "요기요",
-    "식권",
-    "식신",
-    "네이버 포장",
-    "기타"
-  ];
-
-  if (!allowedChannels.includes(newChannel)) {
-    alert("올바른 채널을 입력해주세요.");
-    return;
-  }
-
-  const newAmount =
-    prompt("매출액을 입력하세요.");
-
-  if (!newAmount || Number(newAmount) <= 0) {
-    alert("올바른 매출액을 입력해주세요.");
-    return;
-  }
-
-  try {
-
-    const { error } = await supabaseClient
-      .from("sales")
-      .update({
-        sale_date: newDate,
-        channel: newChannel,
-        amount: Number(newAmount)
-      })
-      .eq("id", id);
-
-    if (error) {
-      throw error;
-    }
-
-    alert("매출이 수정되었습니다.");
-
-    await loadSales();
-    await loadProfitSales();
-
-  } catch (error) {
-
-    console.error(error);
-
-    alert(
-      "매출 수정에 실패했습니다: " +
-      error.message
-    );
-  }
-}
-
-  function calculateCoupangFees() {
-  const channel = document.getElementById("depositChannel").value;
-  const salesAmount = Number(
-    document.getElementById("salesAmount").value || 0
-  );
-
-  const feeBox = document.getElementById("coupangFeeBox");
-
-  // 쿠팡이츠 수수료 선택창 표시/숨김
-  if (feeBox) {
-    feeBox.style.display =
-      channel === "쿠팡이츠" ? "block" : "none";
-  }
-
-  // 매출이 없으면 계산하지 않음
-  if (salesAmount <= 0) {
-    return;
-  }
-
-  // =========================
-  // 쿠팡이츠
-  // =========================
-  if (channel === "쿠팡이츠") {
-
-    const feeRate = Number(
-      document.getElementById("coupangFeeRate").value || 0.078
-    );
-
-    const brokerageFee = Math.round(
-      salesAmount * feeRate
-    );
-
-    // 결제대행 수수료 3%
-const paymentFee = Math.ceil(
-  salesAmount * 0.03
-);
-
-document.getElementById("brokerageFee").value =
-  brokerageFee;
-
-document.getElementById("paymentFee").value =
-  paymentFee;
 
     calculateDeposit();
-    return;
+
   }
 
-  // =========================
-  // 배달의민족
-  // =========================
-  if (channel === "배달의민족") {
 
-    // 중개이용료 6.8%
-    const brokerageFee = Math.round(
-      salesAmount * 0.068
-    );
-
-    // 결제대행 수수료 1.4%
-    const paymentFee = Math.ceil(
-  salesAmount * 0.014
-);
-
-    // 배달비는 정산서에 따라 직접 입력
-    const deliveryFee = Number(
-      document.getElementById("deliveryFee").value || 0
-    );
-
-    // 부가세
-    // 중개이용료 + 결제대행 수수료 + 배달비의 10%
-    const vat = Math.round(
-      (brokerageFee + paymentFee + deliveryFee) * 0.10
-    );
-
-    document.getElementById("brokerageFee").value =
-      brokerageFee;
-
-    document.getElementById("paymentFee").value =
-      paymentFee;
-
-    document.getElementById("vat1").value =
-      vat;
-
-    calculateDeposit();
-    return;
-  }
-
-  // =========================
-  // 홀 / 요기요 / 기타
-  // =========================
-  calculateDeposit();
-}
+  // ==========================================
+  // 정산 자동 계산
+  // ==========================================
 
   function calculateDeposit() {
-  const salesAmount = Number(document.getElementById("salesAmount").value || 0);
-  const brokerageFee = Number(document.getElementById("brokerageFee").value || 0);
-  const deliveryFee = Number(document.getElementById("deliveryFee").value || 0);
-  const couponDiscount = Number(document.getElementById("couponDiscount").value || 0);
-  const instantDiscount = Number(document.getElementById("instantDiscount").value || 0);
-  const advertisingFee = Number(document.getElementById("advertisingFee").value || 0);
-  const paymentFee = Number(document.getElementById("paymentFee").value || 0);
-  const vat = Number(document.getElementById("vat1").value || 0);
-  const feeAdjustment = Number(document.getElementById("feeAdjustment").value || 0);
-  const vatAdjustment = Number(document.getElementById("vat2Adjustment").value || 0);
 
-  const totalDeduction =
-    brokerageFee +
-    deliveryFee +
-    couponDiscount +
-    instantDiscount +
-    advertisingFee +
-    paymentFee +
-    vat;
+    const ids = [
+      "salesAmount",
+      "brokerageFee",
+      "deliveryFee",
+      "couponDiscount",
+      "instantDiscount",
+      "advertisingFee",
+      "paymentFee",
+      "vat1",
+      "feeAdjustment",
+      "vat2Adjustment"
+    ];
 
-  const depositAmount =
-    salesAmount -
-    totalDeduction +
-    feeAdjustment +
-    vatAdjustment;
 
-  document.getElementById("depositAmount").value =
-    depositAmount > 0 ? depositAmount : 0;
+    const values = {};
 
-  const settlementRate =
-    salesAmount > 0
-      ? ((depositAmount / salesAmount) * 100).toFixed(1)
-      : "0.0";
 
-  document.getElementById("depositCalcInfo").textContent =
-    `예상 정산액 ${won(depositAmount)} · 실제 정산률 ${settlementRate}% · 총 차감액 ${won(salesAmount - depositAmount)}`;
+    ids.forEach(id => {
+
+      values[id] =
+        Number(
+          document.getElementById(id)
+            ?.value || 0
+        );
+
+    });
+
+
+    const totalDeduction =
+      values.brokerageFee +
+      values.deliveryFee +
+      values.couponDiscount +
+      values.instantDiscount +
+      values.advertisingFee +
+      values.paymentFee +
+      values.vat1;
+
+
+    const depositAmount =
+      values.salesAmount -
+      totalDeduction +
+      values.feeAdjustment +
+      values.vat2Adjustment;
+
+
+    const finalAmount =
+      Math.max(
+        depositAmount,
+        0
+      );
+
+
+    const depositAmountInput =
+      document.getElementById(
+        "depositAmount"
+      );
+
+
+    if (depositAmountInput) {
+
+      depositAmountInput.value =
+        finalAmount;
+
+    }
+
+
+    const info =
+      document.getElementById(
+        "depositCalcInfo"
+      );
+
+
+    if (info) {
+
+      const rate =
+        values.salesAmount > 0
+          ? (
+              finalAmount /
+              values.salesAmount *
+              100
+            ).toFixed(1)
+          : "0.0";
+
+
+      info.textContent =
+        `예상 정산액 ${won(finalAmount)} · ` +
+        `실제 정산률 ${rate}% · ` +
+        `총 차감액 ${won(
+          values.salesAmount -
+          finalAmount
+        )}`;
+
+    }
+
   }
+
+
+  // ==========================================
+  // 정산 불러오기
+  // ==========================================
+
+  async function loadDeposits() {
+
+    const depositList =
+      document.getElementById(
+        "depositList"
+      );
+
+
+    const totalDeposit =
+      document.getElementById(
+        "totalDeposit"
+      );
+
+
+    const totalFee =
+      document.getElementById(
+        "totalFee"
+      );
+
+
+    try {
+
+      const {
+        data,
+        error
+      } =
+        await supabaseClient
+          .from("deposit_details")
+          .select("*")
+          .order(
+            "deposit_date",
+            { ascending:false }
+          )
+          .order(
+            "id",
+            { ascending:false }
+          );
+
+
+      if (error) {
+        throw error;
+      }
+
+
+      const monthFilter =
+        document.getElementById(
+          "depositMonthFilter"
+        )?.value || "";
+
+
+      const dateFilter =
+        document.getElementById(
+          "depositDateFilter"
+        )?.value || "";
+
+
+      let filteredData =
+        data || [];
+
+
+      if (monthFilter) {
+
+        filteredData =
+          filteredData.filter(
+            item =>
+              item.deposit_date &&
+              item.deposit_date.startsWith(
+                monthFilter
+              )
+          );
+
+      }
+
+
+      if (dateFilter) {
+
+        filteredData =
+          filteredData.filter(
+            item =>
+              item.deposit_date ===
+              dateFilter
+          );
+
+      }
+
+
+      if (!filteredData.length) {
+
+        depositList.innerHTML =
+          "<p>선택한 조건의 정산 데이터가 없습니다.</p>";
+
+        totalDeposit.textContent =
+          "0원";
+
+        totalFee.textContent =
+          "0원";
+
+        return;
+      }
+
+
+      let depositSum = 0;
+      let feeSum = 0;
+
+
+      depositList.innerHTML =
+        filteredData
+          .map(item => {
+
+            const totalDeductions =
+              Number(
+                item.brokerage_fee || 0
+              ) +
+              Number(
+                item.delivery_fee || 0
+              ) +
+              Number(
+                item.coupon_discount || 0
+              ) +
+              Number(
+                item.instant_discount || 0
+              ) +
+              Number(
+                item.advertising_fee || 0
+              ) +
+              Number(
+                item.payment_fee || 0
+              ) +
+              Number(
+                item.vat || 0
+              );
+
+
+            const adjustments =
+              Number(
+                item.fee_adjustment || 0
+              ) +
+              Number(
+                item.vat_adjustment || 0
+              );
+
+
+            const actualFee =
+              totalDeductions -
+              adjustments;
+
+
+            depositSum +=
+              Number(
+                item.deposit_amount || 0
+              );
+
+
+            feeSum +=
+              actualFee;
+
+
+            const settlementRate =
+              Number(
+                item.sales_amount || 0
+              ) > 0
+                ? (
+                    Number(
+                      item.deposit_amount || 0
+                    ) /
+                    Number(
+                      item.sales_amount || 0
+                    ) *
+                    100
+                  ).toFixed(1)
+                : "0.0";
+
+
+            return `
+              <div
+                class="row"
+                style="
+                  padding:18px 0;
+                  border-bottom:1px solid #eee;
+                "
+              >
+
+                <div>
+
+                  <strong>
+                    ${item.channel}
+                  </strong>
+
+                  <div
+                    style="
+                      margin-top:8px;
+                    "
+                  >
+
+                    <button
+                      type="button"
+                      onclick="editDeposit(${item.id})"
+                      style="
+                        margin-right:5px;
+                      "
+                    >
+                      수정
+                    </button>
+
+                    <button
+                      type="button"
+                      onclick="deleteDeposit(${item.id})"
+                    >
+                      삭제
+                    </button>
+
+                  </div>
+
+
+                  <div
+                    style="
+                      font-size:13px;
+                      color:#777;
+                    "
+                  >
+                    ${item.deposit_date}
+                  </div>
+
+
+                  <div
+                    style="
+                      margin-top:10px;
+                      font-size:13px;
+                      line-height:1.8;
+                      color:#555;
+                    "
+                  >
+
+                    매출 ${won(item.sales_amount)} ·
+                    중개 ${won(item.brokerage_fee)} ·
+                    배달비 ${won(item.delivery_fee)}
+                    <br>
+
+                    쿠폰 ${won(item.coupon_discount)} ·
+                    즉시할인 ${won(item.instant_discount)} ·
+                    광고비 ${won(item.advertising_fee)}
+                    <br>
+
+                    결제수수료 ${won(item.payment_fee)} ·
+                    부가세 ${won(item.vat)}
+                    <br>
+
+                    수수료 보정 ${won(item.fee_adjustment)} ·
+                    부가세 보정 ${won(item.vat_adjustment)}
+
+                  </div>
+
+                </div>
+
+
+                <div
+                  style="
+                    text-align:right;
+                    margin-top:10px;
+                  "
+                >
+
+                  <strong>
+                    ${won(item.deposit_amount)}
+                  </strong>
+
+                  <div
+                    style="
+                      font-size:13px;
+                      color:#777;
+                    "
+                  >
+                    매출 ${won(item.sales_amount)}
+                  </div>
+
+                  <div
+                    style="
+                      font-size:13px;
+                      color:#777;
+                    "
+                  >
+                    실제 정산율 ${settlementRate}%
+                  </div>
+
+                  <div
+                    style="
+                      font-size:13px;
+                      color:#777;
+                    "
+                  >
+                    실제 차감액 ${won(actualFee)}
+                  </div>
+
+                </div>
+
+              </div>
+            `;
+
+          })
+          .join("");
+
+
+      totalDeposit.textContent =
+        won(depositSum);
+
+
+      totalFee.textContent =
+        won(feeSum);
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      depositList.innerHTML =
+        `<p style="color:red;">
+          정산 데이터를 불러오지 못했습니다:
+          ${error.message}
+        </p>`;
+
+
+      totalDeposit.textContent =
+        "0원";
+
+
+      totalFee.textContent =
+        "0원";
+
+    }
+
+  }
+
+
+  // ==========================================
+  // 정산 저장
+  // ==========================================
+
   async function saveDeposit() {
-  const depositDate = document.getElementById("depositDate").value;
-  const channel = document.getElementById("depositChannel").value;
 
-  const salesAmount = Number(document.getElementById("salesAmount").value || 0);
-  const brokerageFee = Number(document.getElementById("brokerageFee").value || 0);
-  const deliveryFee = Number(document.getElementById("deliveryFee").value || 0);
-  const couponDiscount = Number(document.getElementById("couponDiscount").value || 0);
-  const instantDiscount = Number(document.getElementById("instantDiscount").value || 0);
-  const advertisingFee = Number(document.getElementById("advertisingFee").value || 0);
-  const paymentFee = Number(document.getElementById("paymentFee").value || 0);
-  const vat = Number(document.getElementById("vat1").value || 0);
-  const feeAdjustment = Number(document.getElementById("feeAdjustment").value || 0);
-  const vatAdjustment = Number(document.getElementById("vat2Adjustment").value || 0);
-  const depositAmount = Number(document.getElementById("depositAmount").value || 0);
-  const memo = document.getElementById("depositMemo").value;
+    const depositDate =
+      document.getElementById(
+        "depositDate"
+      ).value;
 
-  if (!depositDate) {
-    alert("정산 날짜를 입력해주세요.");
-    return;
-  }
 
-  if (!salesAmount) {
-    alert("매출액을 입력해주세요.");
-    return;
-  }
+    const channel =
+      document.getElementById(
+        "depositChannel"
+      ).value;
 
-  if (!depositAmount) {
-    alert("최종 정산액을 입력해주세요.");
-    return;
-  }
 
-  try {
-    const { error } = await supabaseClient
-      .from("deposit_details")
-      .insert({
-        deposit_date: depositDate,
-        channel: channel,
-        sales_amount: salesAmount,
-        brokerage_fee: brokerageFee,
-        delivery_fee: deliveryFee,
-        coupon_discount: couponDiscount,
-        instant_discount: instantDiscount,
-        advertising_fee: advertisingFee,
-        payment_fee: paymentFee,
-        vat: vat,
-        fee_adjustment: feeAdjustment,
-        vat_adjustment: vatAdjustment,
-        deposit_amount: depositAmount,
-        memo: memo
+    const salesAmount =
+      Number(
+        document.getElementById(
+          "salesAmount"
+        ).value || 0
+      );
+
+
+    const brokerageFee =
+      Number(
+        document.getElementById(
+          "brokerageFee"
+        ).value || 0
+      );
+
+
+    const deliveryFee =
+      Number(
+        document.getElementById(
+          "deliveryFee"
+        ).value || 0
+      );
+
+
+    const couponDiscount =
+      Number(
+        document.getElementById(
+          "couponDiscount"
+        ).value || 0
+      );
+
+
+    const instantDiscount =
+      Number(
+        document.getElementById(
+          "instantDiscount"
+        ).value || 0
+      );
+
+
+    const advertisingFee =
+      Number(
+        document.getElementById(
+          "advertisingFee"
+        ).value || 0
+      );
+
+
+    const paymentFee =
+      Number(
+        document.getElementById(
+          "paymentFee"
+        ).value || 0
+      );
+
+
+    const vat =
+      Number(
+        document.getElementById(
+          "vat1"
+        ).value || 0
+      );
+
+
+    const feeAdjustment =
+      Number(
+        document.getElementById(
+          "feeAdjustment"
+        ).value || 0
+      );
+
+
+    const vatAdjustment =
+      Number(
+        document.getElementById(
+          "vat2Adjustment"
+        ).value || 0
+      );
+
+
+    const depositAmount =
+      Number(
+        document.getElementById(
+          "depositAmount"
+        ).value || 0
+      );
+
+
+    const memo =
+      document.getElementById(
+        "depositMemo"
+      ).value;
+
+
+    if (!depositDate) {
+
+      alert(
+        "정산 날짜를 입력해주세요."
+      );
+
+      return;
+    }
+
+
+    if (salesAmount <= 0) {
+
+      alert(
+        "매출액을 입력해주세요."
+      );
+
+      return;
+    }
+
+
+    if (depositAmount <= 0) {
+
+      alert(
+        "최종 정산액을 입력해주세요."
+      );
+
+      return;
+    }
+
+
+    try {
+
+      const { error } =
+        await supabaseClient
+          .from("deposit_details")
+          .insert({
+
+            deposit_date:
+              depositDate,
+
+            channel:
+              channel,
+
+            sales_amount:
+              salesAmount,
+
+            brokerage_fee:
+              brokerageFee,
+
+            delivery_fee:
+              deliveryFee,
+
+            coupon_discount:
+              couponDiscount,
+
+            instant_discount:
+              instantDiscount,
+
+            advertising_fee:
+              advertisingFee,
+
+            payment_fee:
+              paymentFee,
+
+            vat:
+              vat,
+
+            fee_adjustment:
+              feeAdjustment,
+
+            vat_adjustment:
+              vatAdjustment,
+
+            deposit_amount:
+              depositAmount,
+
+            memo:
+              memo
+
+          });
+
+
+      if (error) {
+        throw error;
+      }
+
+
+      alert(
+        "정산이 저장되었습니다."
+      );
+
+
+      [
+        "salesAmount",
+        "brokerageFee",
+        "deliveryFee",
+        "couponDiscount",
+        "instantDiscount",
+        "advertisingFee",
+        "paymentFee",
+        "vat1",
+        "feeAdjustment",
+        "vat2Adjustment",
+        "depositAmount",
+        "depositMemo"
+      ].forEach(id => {
+
+        const element =
+          document.getElementById(id);
+
+        if (element) {
+          element.value = "";
+        }
+
       });
 
-    if (error) {
-      throw error;
+
+      await loadDeposits();
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "정산 저장에 실패했습니다: " +
+        error.message
+      );
+
     }
 
-    alert("정산이 저장되었습니다.");
-
-    document.getElementById("salesAmount").value = "";
-    document.getElementById("brokerageFee").value = "";
-    document.getElementById("deliveryFee").value = "";
-    document.getElementById("couponDiscount").value = "";
-    document.getElementById("instantDiscount").value = "";
-    document.getElementById("advertisingFee").value = "";
-    document.getElementById("paymentFee").value = "";
-    document.getElementById("vat1").value = "";
-    document.getElementById("feeAdjustment").value = "";
-    document.getElementById("vat2Adjustment").value = "";
-    document.getElementById("depositAmount").value = "";
-    document.getElementById("depositMemo").value = "";
-
-    await loadDeposits();
-
-  } catch (error) {
-    console.error(error);
-    alert("정산 저장에 실패했습니다: " + error.message);
-  }
-}
-  async function deleteDeposit(id) {
-
-  if (!confirm("이 정산 내역을 삭제하시겠습니까?")) {
-    return;
   }
 
-  try {
 
-    const { error } = await supabaseClient
-      .from("deposit_details")
-      .delete()
-      .eq("id", id);
+  // ==========================================
+  // 정산 수정
+  // ==========================================
 
-    if (error) {
-      throw error;
-    }
-
-    alert("정산 내역이 삭제되었습니다.");
-
-    await loadDeposits();
-
-  } catch (error) {
-
-    console.error(error);
-
-    alert(
-      "정산 삭제에 실패했습니다: " +
-      error.message
-    );
-  }
-}
   async function editDeposit(id) {
 
-  const newDate =
-    prompt("정산 날짜를 입력하세요. 예: 2026-08-26");
+    try {
 
-  if (!newDate) {
-    return;
-  }
+      const {
+        data: item,
+        error: fetchError
+      } =
+        await supabaseClient
+          .from("deposit_details")
+          .select("*")
+          .eq("id", id)
+          .single();
 
-  const newChannel =
-    prompt(
-      "정산 채널을 입력하세요.\n\n" +
-      "쿠팡이츠 / 배달의민족 / 요기요 / 기타"
-    );
 
-  if (!newChannel) {
-    return;
-  }
+      if (fetchError) {
+        throw fetchError;
+      }
 
-  const allowedChannels = [
-    "쿠팡이츠",
-    "배달의민족",
-    "요기요",
-    "기타"
-  ];
 
-  if (!allowedChannels.includes(newChannel)) {
-    alert("올바른 채널을 입력해주세요.");
-    return;
-  }
+      const newDate =
+        prompt(
+          "정산 날짜를 수정하세요.",
+          item.deposit_date
+        );
 
-  const newSalesAmount =
-    prompt("매출액을 입력하세요.");
 
-  if (!newSalesAmount || Number(newSalesAmount) <= 0) {
-    alert("올바른 매출액을 입력해주세요.");
-    return;
-  }
+      if (!newDate) {
+        return;
+      }
 
-  const newDepositAmount =
-    prompt("최종 정산액을 입력하세요.");
 
-  if (!newDepositAmount || Number(newDepositAmount) <= 0) {
-    alert("올바른 정산액을 입력해주세요.");
-    return;
-  }
+      const allowedChannels = [
+        "쿠팡이츠",
+        "배달의민족",
+        "요기요",
+        "기타"
+      ];
 
-  try {
 
-    const { error } = await supabaseClient
-      .from("deposit_details")
-      .update({
-        deposit_date: newDate,
-        channel: newChannel,
-        sales_amount: Number(newSalesAmount),
-        deposit_amount: Number(newDepositAmount)
-      })
-      .eq("id", id);
+      const newChannel =
+        prompt(
+          "정산 채널을 수정하세요.\n\n" +
+          "쿠팡이츠 / 배달의민족 / 요기요 / 기타",
+          item.channel
+        );
 
-    if (error) {
-      throw error;
+
+      if (!newChannel) {
+        return;
+      }
+
+
+      if (
+        !allowedChannels.includes(
+          newChannel
+        )
+      ) {
+
+        alert(
+          "올바른 채널을 입력해주세요."
+        );
+
+        return;
+      }
+
+
+      const newSalesAmount =
+        prompt(
+          "매출액을 수정하세요.",
+          item.sales_amount
+        );
+
+
+      if (
+        !newSalesAmount ||
+        Number(newSalesAmount) <= 0
+      ) {
+
+        alert(
+          "올바른 매출액을 입력해주세요."
+        );
+
+        return;
+      }
+
+
+      const newDepositAmount =
+        prompt(
+          "최종 정산액을 수정하세요.",
+          item.deposit_amount
+        );
+
+
+      if (
+        !newDepositAmount ||
+        Number(newDepositAmount) <= 0
+      ) {
+
+        alert(
+          "올바른 정산액을 입력해주세요."
+        );
+
+        return;
+      }
+
+
+      const {
+        data: updatedItem,
+        error: updateError
+      } =
+        await supabaseClient
+          .from("deposit_details")
+          .update({
+
+            deposit_date:
+              newDate,
+
+            channel:
+              newChannel,
+
+            sales_amount:
+              Number(newSalesAmount),
+
+            deposit_amount:
+              Number(newDepositAmount)
+
+          })
+          .eq("id", id)
+          .select()
+          .single();
+
+
+      if (updateError) {
+        throw updateError;
+      }
+
+
+      if (!updatedItem) {
+
+        alert(
+          "수정된 정산을 확인하지 못했습니다."
+        );
+
+        return;
+      }
+
+
+      alert(
+        "정산 내역이 수정되었습니다."
+      );
+
+
+      await loadDeposits();
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "정산 수정에 실패했습니다: " +
+        error.message
+      );
+
     }
 
-    alert("정산 내역이 수정되었습니다.");
+  }
 
-    await loadDeposits();
 
-  } catch (error) {
+  // ==========================================
+  // 정산 삭제
+  // ==========================================
 
-    console.error(error);
+  async function deleteDeposit(id) {
 
-    alert(
-      "정산 수정에 실패했습니다: " +
-      error.message
+    if (
+      !confirm(
+        "이 정산 내역을 삭제하시겠습니까?"
+      )
+    ) {
+      return;
+    }
+
+
+    try {
+
+      const {
+        data: deletedItem,
+        error
+      } =
+        await supabaseClient
+          .from("deposit_details")
+          .delete()
+          .eq("id", id)
+          .select()
+          .single();
+
+
+      if (error) {
+        throw error;
+      }
+
+
+      if (!deletedItem) {
+
+        alert(
+          "삭제된 정산을 확인하지 못했습니다."
+        );
+
+        return;
+      }
+
+
+      alert(
+        "정산 내역이 삭제되었습니다."
+      );
+
+
+      await loadDeposits();
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "정산 삭제에 실패했습니다: " +
+        error.message
+      );
+
+    }
+
+  }
+
+
+  // ==========================================
+  // 이벤트 연결
+  // ==========================================
+
+  const saleMonthFilter =
+    document.getElementById(
+      "saleMonthFilter"
     );
+
+  const saleDateFilter =
+    document.getElementById(
+      "saleDateFilter"
+    );
+
+
+  if (saleMonthFilter) {
+
+    saleMonthFilter.addEventListener(
+      "change",
+      loadSales
+    );
+
   }
-}
-// 입력값 변경 시 정산액 자동 계산
-[
-  "salesAmount",
-  "brokerageFee",
-  "deliveryFee",
-  "couponDiscount",
-  "instantDiscount",
-  "advertisingFee",
-  "paymentFee",
-  "vat1",
-  "feeAdjustment",
-  "vat2Adjustment"
-].forEach(id => {
-  const element = document.getElementById(id);
 
-  if (element) {
-    element.addEventListener("input", calculateDeposit);
-    element.addEventListener("change", calculateDeposit);
+
+  if (saleDateFilter) {
+
+    saleDateFilter.addEventListener(
+      "change",
+      loadSales
+    );
+
   }
-});
-// 쿠팡이츠 자동 수수료 계산 연결
-const salesInput = document.getElementById("salesAmount");
-const channelSelect = document.getElementById("depositChannel");
 
-if (salesInput) {
-  salesInput.addEventListener("input", calculateCoupangFees);
-  salesInput.addEventListener("change", calculateCoupangFees);
-}
 
-if (channelSelect) {
-  channelSelect.addEventListener("change", calculateCoupangFees);
-}  
+  const depositMonthFilter =
+    document.getElementById(
+      "depositMonthFilter"
+    );
+
+  const depositDateFilter =
+    document.getElementById(
+      "depositDateFilter"
+    );
+
+
+  if (depositMonthFilter) {
+
+    depositMonthFilter.addEventListener(
+      "change",
+      loadDeposits
+    );
+
+  }
+
+
+  if (depositDateFilter) {
+
+    depositDateFilter.addEventListener(
+      "change",
+      loadDeposits
+    );
+
+  }
+
+
+  function clearSaleFilter() {
+
+    if (saleMonthFilter) {
+      saleMonthFilter.value = "";
+    }
+
+    if (saleDateFilter) {
+      saleDateFilter.value = "";
+    }
+
+    loadSales();
+
+  }
+
+
+  function clearDepositFilter() {
+
+    if (depositMonthFilter) {
+      depositMonthFilter.value = "";
+    }
+
+    if (depositDateFilter) {
+      depositDateFilter.value = "";
+    }
+
+    loadDeposits();
+
+  }
+
+
+  // ==========================================
+  // 정산 입력 자동계산 이벤트
+  // ==========================================
+
+  [
+    "salesAmount",
+    "brokerageFee",
+    "deliveryFee",
+    "couponDiscount",
+    "instantDiscount",
+    "advertisingFee",
+    "paymentFee",
+    "vat1",
+    "feeAdjustment",
+    "vat2Adjustment"
+  ].forEach(id => {
+
+    const element =
+      document.getElementById(id);
+
+    if (element) {
+
+      element.addEventListener(
+        "input",
+        calculateDeposit
+      );
+
+      element.addEventListener(
+        "change",
+        calculateDeposit
+      );
+
+    }
+
+  });
+
+
+  const salesInput =
+    document.getElementById(
+      "salesAmount"
+    );
+
+  const channelSelect =
+    document.getElementById(
+      "depositChannel"
+    );
+
+
+  if (salesInput) {
+
+    salesInput.addEventListener(
+      "input",
+      calculateCoupangFees
+    );
+
+    salesInput.addEventListener(
+      "change",
+      calculateCoupangFees
+    );
+
+  }
+
+
+  if (channelSelect) {
+
+    channelSelect.addEventListener(
+      "change",
+      calculateCoupangFees
+    );
+
+  }
+
+
+  const profitMonthInput =
+    document.getElementById(
+      "profitMonth"
+    );
+
+
+  if (profitMonthInput) {
+
+    profitMonthInput.addEventListener(
+      "change",
+      async () => {
+        await loadProfitSales();
+        loadSavedMonthlyProfit();
+      }
+    );
+
+  }
+
+
+  // ==========================================
+  // 최초 실행
+  // ==========================================
+
+  createChartAreas();
+
+  loadSales();
+
+  loadDeposits();
+
+  loadProfitSales();
+
+  loadSavedMonthlyProfit();
+
 </script>
 
 </body>
