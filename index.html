@@ -391,14 +391,14 @@
 
 
   loadSales();
-  async function loadDeposits() {
+ async function loadDeposits() {
   const depositList = document.getElementById("depositList");
   const totalDeposit = document.getElementById("totalDeposit");
   const totalFee = document.getElementById("totalFee");
 
   try {
     const { data, error } = await supabaseClient
-      .from("deposits")
+      .from("deposit_details")
       .select("*")
       .order("deposit_date", { ascending: false })
       .order("id", { ascending: false });
@@ -418,22 +418,68 @@
     let feeSum = 0;
 
     depositList.innerHTML = data.map(item => {
+
+      const totalDeductions =
+        Number(item.brokerage_fee || 0) +
+        Number(item.delivery_fee || 0) +
+        Number(item.coupon_discount || 0) +
+        Number(item.instant_discount || 0) +
+        Number(item.advertising_fee || 0) +
+        Number(item.payment_fee || 0) +
+        Number(item.vat_1 || 0);
+
+      const adjustments =
+        Number(item.fee_adjustment || 0) +
+        Number(item.vat_2_adjustment || 0);
+
+      const actualFee = totalDeductions - adjustments;
+
       depositSum += Number(item.deposit_amount || 0);
-      feeSum += Number(item.fee || 0);
+      feeSum += actualFee;
+
+      const settlementRate =
+        Number(item.sales_amount || 0) > 0
+          ? (Number(item.deposit_amount || 0) / Number(item.sales_amount || 0) * 100).toFixed(1)
+          : "0.0";
 
       return `
-        <div class="row">
+        <div class="row" style="padding:18px 0;border-bottom:1px solid #eee;">
           <div>
             <strong>${item.channel}</strong>
             <div style="font-size:13px;color:#777;">
               ${item.deposit_date}
             </div>
+
+            <div style="margin-top:10px;font-size:13px;line-height:1.8;color:#555;">
+              매출 ${won(item.sales_amount)} ·
+              중개 ${won(item.brokerage_fee)} ·
+              배달비 ${won(item.delivery_fee)}<br>
+
+              쿠폰 ${won(item.coupon_discount)} ·
+              즉시할인 ${won(item.instant_discount)} ·
+              광고비 ${won(item.advertising_fee)}<br>
+
+              결제수수료 ${won(item.payment_fee)} ·
+              부가세 ${won(item.vat_1)}<br>
+
+              수수료 보정 ${won(item.fee_adjustment)} ·
+              부가세 보정 ${won(item.vat_2_adjustment)}
+            </div>
           </div>
 
-          <div style="text-align:right;">
+          <div style="text-align:right;margin-top:10px;">
             <strong>${won(item.deposit_amount)}</strong>
+
             <div style="font-size:13px;color:#777;">
-              매출 ${won(item.sales_amount)} · 수수료 ${won(item.fee)}
+              매출 ${won(item.sales_amount)}
+            </div>
+
+            <div style="font-size:13px;color:#777;">
+              실제 정산율 ${settlementRate}%
+            </div>
+
+            <div style="font-size:13px;color:#777;">
+              실제 차감액 ${won(actualFee)}
             </div>
           </div>
         </div>
@@ -445,8 +491,12 @@
 
   } catch (error) {
     console.error(error);
+
     depositList.innerHTML =
       `<p style="color:red;">정산 데이터를 불러오지 못했습니다: ${error.message}</p>`;
+
+    totalDeposit.textContent = "0원";
+    totalFee.textContent = "0원";
   }
 }
 
