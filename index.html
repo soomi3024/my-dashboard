@@ -599,7 +599,84 @@
 
 loadSales();
 loadDeposits();
+async function saveDeposit() {
+  const depositDate = document.getElementById("depositDate").value;
+  const channel = document.getElementById("depositChannel").value;
 
+  const salesAmount = Number(document.getElementById("salesAmount").value || 0);
+  const brokerageFee = Number(document.getElementById("brokerageFee").value || 0);
+  const deliveryFee = Number(document.getElementById("deliveryFee").value || 0);
+  const couponDiscount = Number(document.getElementById("couponDiscount").value || 0);
+  const instantDiscount = Number(document.getElementById("instantDiscount").value || 0);
+  const advertisingFee = Number(document.getElementById("advertisingFee").value || 0);
+  const paymentFee = Number(document.getElementById("paymentFee").value || 0);
+  const vat = Number(document.getElementById("vat1").value || 0);
+  const feeAdjustment = Number(document.getElementById("feeAdjustment").value || 0);
+  const vatAdjustment = Number(document.getElementById("vat2Adjustment").value || 0);
+  const depositAmount = Number(document.getElementById("depositAmount").value || 0);
+  const memo = document.getElementById("depositMemo").value;
+
+  if (!depositDate) {
+    alert("정산 날짜를 입력해주세요.");
+    return;
+  }
+
+  if (!salesAmount) {
+    alert("매출액을 입력해주세요.");
+    return;
+  }
+
+  if (!depositAmount) {
+    alert("최종 정산액을 입력해주세요.");
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from("deposit_details")
+      .insert({
+        deposit_date: depositDate,
+        channel: channel,
+        sales_amount: salesAmount,
+        brokerage_fee: brokerageFee,
+        delivery_fee: deliveryFee,
+        coupon_discount: couponDiscount,
+        instant_discount: instantDiscount,
+        advertising_fee: advertisingFee,
+        payment_fee: paymentFee,
+        vat: vat,
+        fee_adjustment: feeAdjustment,
+        vat_adjustment: vatAdjustment,
+        deposit_amount: depositAmount,
+        memo: memo
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    alert("정산이 저장되었습니다.");
+
+    document.getElementById("salesAmount").value = "";
+    document.getElementById("brokerageFee").value = "";
+    document.getElementById("deliveryFee").value = "";
+    document.getElementById("couponDiscount").value = "";
+    document.getElementById("instantDiscount").value = "";
+    document.getElementById("advertisingFee").value = "";
+    document.getElementById("paymentFee").value = "";
+    document.getElementById("vat1").value = "";
+    document.getElementById("feeAdjustment").value = "";
+    document.getElementById("vat2Adjustment").value = "";
+    document.getElementById("depositAmount").value = "";
+    document.getElementById("depositMemo").value = "";
+
+    await loadDeposits();
+
+  } catch (error) {
+    console.error(error);
+    alert("정산 저장에 실패했습니다: " + error.message);
+  }
+}
 </script>
 
 </body>
