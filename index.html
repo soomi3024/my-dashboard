@@ -243,30 +243,40 @@
          ============================== -->
 
     <div class="section">
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:15px;">
 
   <div>
     <label style="display:block;font-size:13px;color:#777;margin-bottom:5px;">
       매출 조회 월
     </label>
-
-    <input
-      type="month"
-      id="saleMonthFilter"
-      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;"
-    >
+    <input type="month" id="saleMonthFilter"
+      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box;">
   </div>
 
   <div>
     <label style="display:block;font-size:13px;color:#777;margin-bottom:5px;">
       매출 조회 날짜
     </label>
+    <input type="date" id="saleDateFilter"
+      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box;">
+  </div>
 
-    <input
-      type="date"
-      id="saleDateFilter"
-      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;"
-    >
+  <div>
+    <label style="display:block;font-size:13px;color:#777;margin-bottom:5px;">
+      매출 채널
+    </label>
+    <select id="saleChannelFilter"
+      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box;background:white;">
+      <option value="">전체 채널</option>
+      <option value="홀">홀</option>
+      <option value="쿠팡이츠">쿠팡이츠</option>
+      <option value="배달의민족">배달의민족</option>
+      <option value="요기요">요기요</option>
+      <option value="식권">식권</option>
+      <option value="식신">식신</option>
+      <option value="네이버 포장">네이버 포장</option>
+      <option value="기타">기타</option>
+    </select>
   </div>
 
 </div>
@@ -1494,12 +1504,26 @@
           "saleDateFilter"
         )?.value || "";
 
+      const saleChannelFilter =
+        document.getElementById(
+          "saleChannelFilter"
+        )?.value || "";
+
 
       let filteredSales =
         data || [];
 
 
-      if (saleMonthFilter) {
+      // 날짜가 선택되어 있으면 날짜를 우선 적용합니다.
+      // 날짜가 없을 때만 월 필터를 적용합니다.
+      if (saleDateFilter) {
+
+        filteredSales =
+          filteredSales.filter(
+            row => row.sale_date === saleDateFilter
+          );
+
+      } else if (saleMonthFilter) {
 
         filteredSales =
           filteredSales.filter(
@@ -1512,14 +1536,11 @@
 
       }
 
-
-      if (saleDateFilter) {
+      if (saleChannelFilter) {
 
         filteredSales =
           filteredSales.filter(
-            row =>
-              row.sale_date ===
-              saleDateFilter
+            row => row.channel === saleChannelFilter
           );
 
       }
@@ -1610,9 +1631,14 @@
 
                 <br>
 
-                <small>
+                <button
+                  type="button"
+                  onclick="setSaleDateFilter('${row.sale_date}')"
+                  style="border:0;background:none;padding:0;margin-top:2px;color:#777;font-size:12px;cursor:pointer;text-decoration:underline;"
+                  title="이 날짜의 매출만 보기"
+                >
                   ${row.sale_date}
-                </small>
+                </button>
               </span>
 
               <span>
@@ -1784,7 +1810,7 @@
         await supabaseClient
           .from("sales")
           .select("*")
-          .eq("id", id)
+          .eq("id", Number(id))
           .single();
 
 
@@ -2252,11 +2278,11 @@
           .select("*")
           .order(
             "deposit_date",
-            { ascending:false }
+            { ascending:true }
           )
           .order(
             "id",
-            { ascending:false }
+            { ascending:true }
           );
 
 
@@ -2640,11 +2666,12 @@
 
       if (editingDepositId !== null) {
 
+        const targetId = Number(editingDepositId);
+
         const result = await supabaseClient
           .from("deposit_details")
           .update(payload)
-          .eq("id", Number(editingDepositId))
-          .select("id");
+          .eq("id", targetId);
 
         error = result.error;
 
@@ -2652,13 +2679,28 @@
           throw error;
         }
 
-        if (!result.data || result.data.length === 0) {
-          throw new Error(
-            "수정된 정산 내역이 없습니다. Supabase의 deposit_details UPDATE 권한(RLS 정책)을 확인해주세요."
-          );
+        const { data: updatedCheck, error: checkError } =
+          await supabaseClient
+            .from("deposit_details")
+            .select("id, deposit_date, channel, sales_amount, deposit_amount")
+            .eq("id", targetId)
+            .maybeSingle();
+
+        if (checkError) {
+          throw checkError;
         }
 
-        alert("정산 내역이 수정되었습니다.");
+        if (!updatedCheck) {
+          throw new Error("수정 대상 정산 내역을 다시 확인하지 못했습니다.");
+        }
+
+        alert(
+          "정산 내역이 수정되었습니다.\n\n" +
+          "날짜: " + updatedCheck.deposit_date + "\n" +
+          "채널: " + updatedCheck.channel + "\n" +
+          "매출: " + won(updatedCheck.sales_amount) + "\n" +
+          "최종 정산액: " + won(updatedCheck.deposit_amount)
+        );
 
       } else {
 
@@ -2832,8 +2874,14 @@
         });
       }
 
-      // 현재 저장되어 있던 값을 기준으로 다시 계산하지 않습니다.
-      // 사용자가 매출/수수료 등을 변경하면 자동 계산됩니다.
+      // 수정 화면에 들어온 직후 현재 입력값으로 정산액을 한번 계산합니다.
+      // 이후 사용자가 매출/수수료 등을 바꾸면 자동으로 다시 계산됩니다.
+      if (item.channel === "쿠팡이츠") {
+        calculateCoupangFees();
+      } else {
+        calculateDeposit();
+      }
+
       const info =
         document.getElementById("depositCalcInfo");
 
@@ -2926,20 +2974,32 @@
 
     try {
 
-      const { data: deletedRows, error } =
+      const targetId = Number(id);
+
+      const { error } =
         await supabaseClient
           .from("deposit_details")
           .delete()
-          .eq("id", Number(id))
-          .select("id");
+          .eq("id", targetId);
 
       if (error) {
         throw error;
       }
 
-      if (!deletedRows || deletedRows.length === 0) {
+      const { data: stillThere, error: checkError } =
+        await supabaseClient
+          .from("deposit_details")
+          .select("id")
+          .eq("id", targetId)
+          .maybeSingle();
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (stillThere) {
         throw new Error(
-          "삭제된 정산 내역이 없습니다. Supabase의 deposit_details DELETE 권한(RLS 정책)을 확인해주세요."
+          "삭제되지 않았습니다. Supabase의 deposit_details DELETE 정책을 확인해주세요."
         );
       }
 
@@ -2975,6 +3035,11 @@
       "saleDateFilter"
     );
 
+  const saleChannelFilter =
+    document.getElementById(
+      "saleChannelFilter"
+    );
+
 
   if (saleMonthFilter) {
 
@@ -2989,6 +3054,20 @@
   if (saleDateFilter) {
 
     saleDateFilter.addEventListener(
+      "change",
+      () => {
+        if (saleDateFilter.value && saleMonthFilter) {
+          saleMonthFilter.value = saleDateFilter.value.slice(0, 7);
+        }
+        loadSales();
+      }
+    );
+
+  }
+
+  if (saleChannelFilter) {
+
+    saleChannelFilter.addEventListener(
       "change",
       loadSales
     );
@@ -3027,6 +3106,25 @@
   }
 
 
+  function setSaleDateFilter(date) {
+
+    if (saleDateFilter) {
+      saleDateFilter.value = date || "";
+    }
+
+    if (saleMonthFilter) {
+      saleMonthFilter.value = date ? date.slice(0, 7) : "";
+    }
+
+    loadSales();
+
+    const filterBox = document.getElementById("saleMonthFilter");
+    if (filterBox) {
+      filterBox.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+
   function clearSaleFilter() {
 
     if (saleMonthFilter) {
@@ -3035,6 +3133,10 @@
 
     if (saleDateFilter) {
       saleDateFilter.value = "";
+    }
+
+    if (saleChannelFilter) {
+      saleChannelFilter.value = "";
     }
 
     loadSales();
