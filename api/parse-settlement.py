@@ -7,10 +7,8 @@ import msoffcrypto
 
 app = FastAPI()
 
-
 def norm(v):
     return re.sub(r"\s+", "", str(v or "")).replace("(", "").replace(")", "").lower()
-
 
 def to_num(v):
     if v is None or (isinstance(v, float) and pd.isna(v)):
@@ -25,7 +23,6 @@ def to_num(v):
     except Exception:
         return 0.0
 
-
 def date_only(v):
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return ""
@@ -36,7 +33,6 @@ def date_only(v):
             return ""
         return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
     return dt.strftime("%Y-%m-%d")
-
 
 def decrypt_if_needed(raw: bytes, password: str) -> io.BytesIO:
     source = io.BytesIO(raw)
@@ -57,7 +53,6 @@ def decrypt_if_needed(raw: bytes, password: str) -> io.BytesIO:
     except Exception as exc:
         raise ValueError("엑셀 비밀번호가 맞지 않거나 파일을 읽을 수 없습니다.") from exc
 
-
 def build_headers(raw_df: pd.DataFrame):
     header_rows = min(3, len(raw_df))
     headers = []
@@ -70,7 +65,6 @@ def build_headers(raw_df: pd.DataFrame):
         headers.append(" ".join(parts))
     return headers
 
-
 def find_cols(headers, group_keywords, sub_keywords=()):
     matches = []
     for i, h in enumerate(headers):
@@ -81,32 +75,27 @@ def find_cols(headers, group_keywords, sub_keywords=()):
     matches.sort(reverse=True)
     return [i for _, i in matches]
 
-
 def parse_baemin(stream: io.BytesIO):
     raw = pd.read_excel(stream, header=None, dtype=object)
     if raw.empty or len(raw) < 4:
         raise ValueError("배민 정산 파일 구조를 읽지 못했습니다.")
-
     headers = build_headers(raw)
     date_cols = find_cols(headers, ["입금일"])
     if not date_cols:
         raise ValueError("입금일 열을 찾지 못했습니다.")
     date_col = date_cols[0]
-
     deposit_cols = find_cols(headers, ["입금금액"])
     if not deposit_cols:
         deposit_cols = find_cols(headers, ["입금", "금액"])
     if not deposit_cols:
         raise ValueError("최종 입금금액 열을 찾지 못했습니다.")
     deposit_col = deposit_cols[-1]
-
     sales_cols = find_cols(headers, ["주문금액"], ["합계"])
     if not sales_cols:
         sales_cols = find_cols(headers, ["주문금액"])
     if not sales_cols:
         raise ValueError("주문금액 열을 찾지 못했습니다.")
     sales_col = sales_cols[0]
-
     brokerage_cols = find_cols(headers, ["중개이용료"], ["합계"]) or find_cols(headers, ["중개이용료"])
     discount_cols = find_cols(headers, ["고객할인비용"], ["합계"]) or find_cols(headers, ["고객할인비용"])
     delivery_cols = find_cols(headers, ["배달비"], ["합계"]) or find_cols(headers, ["배달비"])
@@ -114,18 +103,16 @@ def parse_baemin(stream: io.BytesIO):
     vat_cols = find_cols(headers, ["부가세"], ["합계"]) or find_cols(headers, ["부가세"])
     instant_cols = find_cols(headers, ["즉시할인"], ["합계"]) or find_cols(headers, ["즉시할인"])
     ad_cols = find_cols(headers, ["광고비"], ["합계"]) or find_cols(headers, ["광고비"])
-
     def group_value(row, cols):
-        return sum(abs(to_num(row.iloc[c])) for c in cols) if cols else 0.0
-
+        return sum(to_num(row.iloc[c]) for c in cols) if cols else 0.0
     groups = {}
     for r in range(3, len(raw)):
         date = date_only(raw.iloc[r, date_col])
         if not date:
             continue
         row = raw.iloc[r]
-        sales = abs(to_num(row.iloc[sales_col]))
-        deposit = abs(to_num(row.iloc[deposit_col]))
+        sales = to_num(row.iloc[sales_col])
+        deposit = to_num(row.iloc[deposit_col])
         if sales == 0 and deposit == 0:
             continue
         item = {
@@ -151,7 +138,6 @@ def parse_baemin(stream: io.BytesIO):
                 if k not in {"deposit_date", "channel", "memo"}:
                     groups[date][k] += v
     return [groups[k] for k in sorted(groups)]
-
 
 @app.post("/")
 async def parse_settlement(file: UploadFile = File(...), password: str = Form("")):
