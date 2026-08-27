@@ -55,7 +55,7 @@ def decrypt_if_needed(raw: bytes, password: str) -> io.BytesIO:
         raise ValueError("배민 엑셀 파일을 복호화하지 못했습니다. 파일 형식 또는 비밀번호를 확인해주세요.") from exc
 
 def build_headers(raw_df: pd.DataFrame):
-    header_rows = min(6, len(raw_df))
+    header_rows = min(10, len(raw_df))
     headers = []
     for c in raw_df.columns:
         parts = []
@@ -76,31 +76,63 @@ def find_cols(headers, group_keywords, sub_keywords=()):
     matches.sort(reverse=True)
     return [i for _, i in matches]
 
+def find_order_cols(headers):
+    # 배민 파일의 버전별 표기 차이를 모두 허용한다.
+    candidates = []
+    for i, h in enumerate(headers):
+        nh = norm(h)
+        if "주문" in nh and any(k in nh for k in ("금액", "합계", "매출")):
+            score = 0
+            if "합계" in nh:
+                score += 50
+            if "주문금액" in nh:
+                score += 30
+            if "배달주문금액" in nh:
+                score += 20
+            if "비배달" in nh:
+                score += 5
+            candidates.append((score, i))
+    candidates.sort(reverse=True)
+    return [i for _, i in candidates]
+
 def parse_baemin(stream: io.BytesIO):
     raw = pd.read_excel(stream, header=None, dtype=object)
-    if raw.empty or len(raw) < 4:
+    if raw.empty or len(raw) < 2:
         raise ValueError("배민 정산 파일 구조를 읽지 못했습니다.")
     headers = build_headers(raw)
     date_cols = find_cols(headers, ["입금일"])
-    # 배민 파일 형식에 따라 병합 셀/헤더 인식 방식이 달라질 수 있어
-    # 첫 번째 열을 날짜 열 후보로 안전하게 사용한다.
     if not date_cols:
-        for c in range(min(5, raw.shape[1])):
-            values = [date_only(raw.iloc[r, c]) for r in range(min(10, len(raw)))]
-            if sum(bool(x) for x in values) >= 1:
+        for c in range(min(8, raw.shape[1])):
+            values = [date_only(raw.iloc[r, c]) for r in range(min(15, len(raw)))]
+            if sum(bool(x) for x in values) >= 2:
                 date_cols = [c]
                 break
     if not date_cols:
         raise ValueError("입금일 열을 찾지 못했습니다.")
     date_col = date_cols[0]
+
     deposit_cols = find_cols(headers, ["입금금액"]) or find_cols(headers, ["입금", "금액"])
     if not deposit_cols:
         raise ValueError("최종 입금금액 열을 찾지 못했습니다.")
     deposit_col = deposit_cols[-1]
+
     sales_cols = find_cols(headers, ["주문금액"], ["합계"]) or find_cols(headers, ["주문금액"])
     if not sales_cols:
+        sales_cols = find_order_cols(headers)
+    if not sales_cols:
+        # 마지막 안전장치: '주문'이 들어간 숫자성 열을 찾는다.
+        for i, h in enumerate(headers):
+            if "주문" in norm(h):
+                numeric_count = sum(to_num(raw.iloc[r, i]) != 0 for r in range(min(len(raw), 50)))
+                if numeric_count >= 1:
+                    sales_cols.append(i)
+        sales_cols = list(dict.fromkeys(sales_cols))
+    if not sales_cols:
         raise ValueError("주문금액 열을 찾지 못했습니다.")
+    # 합계 열이 있으면 하나만, 없으면 주문금액 관련 열을 합산한다.
     sales_col = sales_cols[0]
+    use_sales_cols = sales_cols if len(sales_cols) > 1 else [sales_col]
+
     brokerage_cols = find_cols(headers, ["중개이용료"], ["합계"]) or find_cols(headers, ["중개이용료"])
     discount_cols = find_cols(headers, ["고객할인비용"], ["합계"]) or find_cols(headers, ["고객할인비용"])
     delivery_cols = find_cols(headers, ["배달비"], ["합계"]) or find_cols(headers, ["배달비"])
@@ -108,15 +140,17 @@ def parse_baemin(stream: io.BytesIO):
     vat_cols = find_cols(headers, ["부가세"], ["합계"]) or find_cols(headers, ["부가세"])
     instant_cols = find_cols(headers, ["즉시할인"], ["합계"]) or find_cols(headers, ["즉시할인"])
     ad_cols = find_cols(headers, ["광고비"], ["합계"]) or find_cols(headers, ["광고비"])
+
     def group_value(row, cols):
         return sum(to_num(row.iloc[c]) for c in cols) if cols else 0.0
+
     groups = {}
-    for r in range(3, len(raw)):
+    for r in range(len(raw)):
         date = date_only(raw.iloc[r, date_col])
         if not date:
             continue
         row = raw.iloc[r]
-        sales = to_num(row.iloc[sales_col])
+        sales = sum(to_num(row.iloc[c]) for c in use_sales_cols)
         deposit = to_num(row.iloc[deposit_col])
         if sales == 0 and deposit == 0:
             continue
