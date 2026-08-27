@@ -7,8 +7,6 @@ import msoffcrypto
 
 app = FastAPI()
 
-def norm(v):
-    return re.sub(r"\s+", "", str(v or "")).replace("(", "").replace(")", "").lower()
 
 def to_num(v):
     if v is None or (isinstance(v, float) and pd.isna(v)):
@@ -23,6 +21,7 @@ def to_num(v):
     except Exception:
         return 0.0
 
+
 def date_only(v):
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return ""
@@ -33,6 +32,11 @@ def date_only(v):
     if m:
         return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
     return ""
+
+
+def norm(v):
+    return re.sub(r"\s+", "", str(v or "")).replace("(", "").replace(")", "").lower()
+
 
 def decrypt_if_needed(raw: bytes, password: str) -> io.BytesIO:
     source = io.BytesIO(raw)
@@ -54,112 +58,94 @@ def decrypt_if_needed(raw: bytes, password: str) -> io.BytesIO:
             raise ValueError("엑셀 비밀번호가 맞지 않습니다.") from exc
         raise ValueError("배민 엑셀 파일을 복호화하지 못했습니다. 파일 형식 또는 비밀번호를 확인해주세요.") from exc
 
-def build_headers(raw_df: pd.DataFrame):
-    header_rows = min(10, len(raw_df))
-    headers = []
-    for c in raw_df.columns:
-        parts = []
-        for r in range(header_rows):
-            v = raw_df.iloc[r, c]
-            if v is not None and not (isinstance(v, float) and pd.isna(v)):
-                parts.append(str(v))
-        headers.append(" ".join(parts))
-    return headers
 
-def find_cols(headers, keyword_groups, sub_keywords=()):
-    matches = []
-    for i, h in enumerate(headers):
-        nh = norm(h)
-        for group in keyword_groups:
-            if all(k in nh for k in group):
-                score = sum(10 for k in sub_keywords if k in nh)
-                matches.append((score, i))
-                break
-    matches.sort(reverse=True)
-    return [i for _, i in matches]
-
-def best_date_col(raw, headers):
-    cols = find_cols(headers, [["입금일"], ["지급일"], ["정산일"], ["입금", "일자"], ["지급", "일자"]])
-    if cols:
-        return cols[0]
-    # 배민 파일의 병합/다중 헤더 구조가 바뀌어도 실제 데이터에서 날짜가 많은 열을 찾는다.
-    best = None
-    best_count = 0
-    for c in range(raw.shape[1]):
-        count = sum(bool(date_only(raw.iloc[r, c])) for r in range(len(raw)))
-        if count > best_count:
-            best_count = count
-            best = c
-    if best is not None and best_count >= 2:
-        return best
+def find_column(columns, candidates):
+    normalized = {norm(c): c for c in columns}
+    for candidate in candidates:
+        if norm(candidate) in normalized:
+            return normalized[norm(candidate)]
+    for c in columns:
+        nc = norm(c)
+        for candidate in candidates:
+            if norm(candidate) in nc:
+                return c
     return None
 
-def best_amount_col(raw, headers, groups, fallback_keywords=()):
-    cols = find_cols(headers, groups)
-    if cols:
-        return cols[0]
-    if fallback_keywords:
-        cols = find_cols(headers, [[k] for k in fallback_keywords])
-        if cols:
-            return cols[0]
-    return None
+
+def sum_columns(df, candidates):
+    cols = []
+    for c in df.columns:
+        nc = norm(c)
+        if any(norm(x) in nc for x in candidates):
+            cols.append(c)
+    if not cols:
+        return pd.Series(0.0, index=df.index)
+    total = pd.Series(0.0, index=df.index)
+    for c in cols:
+        total = total + df[c].map(to_num)
+    return total
+
 
 def parse_baemin(stream: io.BytesIO):
-    raw = pd.read_excel(stream, header=None, dtype=object)
-    if raw.empty or len(raw) < 2:
-        raise ValueError("배민 정산 파일 구조를 읽지 못했습니다.")
-    headers = build_headers(raw)
-    date_col = best_date_col(raw, headers)
+    # 배민 정산명세서는 '상세' 시트의 5번째 행이 실제 컬럼명이다.
+    # 현재 샘플 구조: 0~1 제목/기간, 2~4 다중 헤더, 5행부터 데이터.
+    stream.seek(0)
+    xls = pd.ExcelFile(stream)
+    sheet = "상세" if "상세" in xls.sheet_names else xls.sheet_names[-1]
+    df = pd.read_excel(xls, sheet_name=sheet, header=4, dtype=object)
+    df = df.dropna(how="all")
+    if df.empty:
+        raise ValueError("배민 정산 파일의 상세 데이터를 찾지 못했습니다.")
+
+    # 실제 배민 2026-05 샘플의 열 이름에 우선 대응하고, 이후 파일 변경에도 대비한다.
+    date_col = find_column(df.columns, ["입금일", "지급일", "정산일"])
+    deposit_col = find_column(df.columns, ["입금 금액", "입금금액", "(H) 입금금액", "최종 입금금액"])
+    sales_col = find_column(df.columns, ["바로결제주문금액", "주문금액", "매출금액", "주문합계"])
+
+    if date_col is None:
+        # 마지막 fallback: 날짜 값이 가장 많은 열
+        best_col, best_count = None, 0
+        for c in df.columns:
+            count = sum(bool(date_only(v)) for v in df[c].head(50))
+            if count > best_count:
+                best_col, best_count = c, count
+        date_col = best_col if best_count >= 1 else None
+    if deposit_col is None:
+        raise ValueError("입금 금액 열을 찾지 못했습니다.")
+    if sales_col is None:
+        raise ValueError("주문금액 열을 찾지 못했습니다.")
     if date_col is None:
         raise ValueError("입금일 열을 찾지 못했습니다.")
 
-    deposit_col = best_amount_col(
-        raw, headers,
-        [["입금금액"], ["입금", "금액"], ["실입금액"], ["최종", "입금"], ["정산", "금액"], ["지급", "금액"]],
-        ("입금금액", "실입금액", "정산금액", "지급금액")
-    )
-    sales_col = best_amount_col(
-        raw, headers,
-        [["주문금액", "합계"], ["주문금액"], ["주문", "금액"], ["매출금액"], ["매출", "합계"]],
-        ("주문금액", "매출금액", "주문합계")
-    )
-    if deposit_col is None:
-        raise ValueError("최종 입금금액 열을 찾지 못했습니다.")
-    if sales_col is None:
-        raise ValueError("주문금액 열을 찾지 못했습니다.")
-
-    brokerage_cols = find_cols(headers, [["중개이용료"]])
-    discount_cols = find_cols(headers, [["고객할인비용"]])
-    delivery_cols = find_cols(headers, [["배달비"]])
-    payment_cols = find_cols(headers, [["결제대행수수료"], ["결제", "대행", "수수료"]])
-    vat_cols = find_cols(headers, [["부가세"]])
-    instant_cols = find_cols(headers, [["즉시할인"]])
-    ad_cols = find_cols(headers, [["광고비"]])
-
-    def group_value(row, cols):
-        return sum(to_num(row.iloc[c]) for c in cols) if cols else 0.0
+    # 배민 샘플에서 실제 비용 열을 정확히 매핑한다.
+    brokerage = sum_columns(df, ["중개이용료"])
+    delivery = sum_columns(df, ["배달비"])
+    discount = sum_columns(df, ["고객할인비용", "메뉴할인", "주문금액즉시할인"])
+    payment = sum_columns(df, ["결제정산수수료", "결제대행수수료"])
+    vat = sum_columns(df, ["(E)부가세", "부가세"])
+    instant = sum_columns(df, ["즉시할인"])
+    advertising = sum_columns(df, ["광고비", "우리가게클릭"])
 
     groups = {}
-    for r in range(len(raw)):
-        date = date_only(raw.iloc[r, date_col])
+    for idx, row in df.iterrows():
+        date = date_only(row[date_col])
         if not date:
             continue
-        row = raw.iloc[r]
-        sales = to_num(row.iloc[sales_col])
-        deposit = to_num(row.iloc[deposit_col])
+        sales = to_num(row[sales_col])
+        deposit = to_num(row[deposit_col])
         if sales == 0 and deposit == 0:
             continue
         item = {
             "deposit_date": date,
             "channel": "배달의민족",
             "sales_amount": sales,
-            "brokerage_fee": group_value(row, brokerage_cols),
-            "delivery_fee": group_value(row, delivery_cols),
-            "coupon_discount": group_value(row, discount_cols),
-            "instant_discount": group_value(row, instant_cols),
-            "advertising_fee": group_value(row, ad_cols),
-            "payment_fee": group_value(row, payment_cols),
-            "vat": group_value(row, vat_cols),
+            "brokerage_fee": float(brokerage.loc[idx]),
+            "delivery_fee": float(delivery.loc[idx]),
+            "coupon_discount": float(discount.loc[idx]),
+            "instant_discount": float(instant.loc[idx]),
+            "advertising_fee": float(advertising.loc[idx]),
+            "payment_fee": float(payment.loc[idx]),
+            "vat": float(vat.loc[idx]),
             "fee_adjustment": 0,
             "vat_adjustment": 0,
             "deposit_amount": deposit,
@@ -172,6 +158,7 @@ def parse_baemin(stream: io.BytesIO):
                 if k not in {"deposit_date", "channel", "memo"}:
                     groups[date][k] += v
     return [groups[k] for k in sorted(groups)]
+
 
 @app.post("/")
 @app.post("/api/parse-settlement")
