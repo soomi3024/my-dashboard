@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#222222">
+<title>정산자료 자동입력</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f6f8;font-family:Arial,sans-serif;color:#222}.wrap{max-width:760px;margin:0 auto;padding:20px}.card{background:#fff;border-radius:16px;padding:22px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.06)}h1{margin:0 0 8px;font-size:25px}.help{color:#777;font-size:13px;line-height:1.6}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field label{display:block;font-size:13px;color:#666;margin-bottom:6px}.field select,.field input{width:100%;padding:12px;border:1px solid #ccc;border-radius:9px;background:#fff}.drop{display:block;border:2px dashed #bbb;border-radius:12px;padding:28px;text-align:center;background:#fafafa;cursor:pointer}.btn{padding:12px 18px;border:0;border-radius:9px;background:#222;color:#fff;font-weight:700;cursor:pointer}.btn:disabled{opacity:.5;cursor:not-allowed}.status{margin-top:14px;padding:14px;border-radius:10px;background:#f7f8fa;line-height:1.7}.ok{color:#087f23}.err{color:#c62828;background:#fff0f0}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.mini{background:#f7f8fa;border:1px solid #e3e5e8;border-radius:10px;padding:14px}.mini span{display:block;color:#777;font-size:12px;margin-bottom:5px}.mini strong{font-size:18px}@media(max-width:600px){.grid,.summary{grid-template-columns:1fr}.wrap{padding:14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card"><h1>📥 정산자료 자동입력</h1><div class="help">쿠팡이츠 또는 배달의민족 정산 엑셀을 선택하면 날짜별로 자동 집계해서 정산관리 DB에 저장합니다.</div></div>
+<div class="card">
+<div class="grid">
+<div class="field"><label>플랫폼</label><select id="platform"><option value="쿠팡이츠">쿠팡이츠</option><option value="배달의민족">배달의민족</option></select></div>
+<div class="field" id="passwordWrap" style="display:none"><label>배민 파일 비밀번호</label><input id="password" type="password" placeholder="엑셀 비밀번호"></div>
+</div>
+<div style="height:12px"></div>
+<label class="drop" for="fileInput"><strong>파일을 선택하세요</strong><br><span class="help">.xlsx / .xls</span></label>
+<input id="fileInput" type="file" accept=".xlsx,.xls" style="display:none">
+<div style="height:12px"></div>
+<button class="btn" id="importBtn" disabled>자동 입력하기</button>
+<div id="status" class="status">파일을 선택하면 자동 분석할 수 있습니다.</div>
+</div>
+<div class="card" id="resultCard" style="display:none"><div class="summary"><div class="mini"><span>입력 건수</span><strong id="count">0건</strong></div><div class="mini"><span>총 매출</span><strong id="sales">0원</strong></div><div class="mini"><span>총 입금액</span><strong id="deposit">0원</strong></div></div><div id="detail" class="status"></div></div>
+</div>
+<script>
+const SUPABASE_URL="https://gvlfyzdswegwmmpzoabc.supabase.co";const SUPABASE_PUBLISHABLE_KEY="sb_publishable_Inp1yZHn3Qrqtzq1TWgUaw_AWxEgK5y";const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const platformEl=document.getElementById('platform'),fileEl=document.getElementById('fileInput'),passwordWrap=document.getElementById('passwordWrap'),passwordEl=document.getElementById('password'),btn=document.getElementById('importBtn'),statusEl=document.getElementById('status');let selectedFile=null;
+platformEl.addEventListener('change',()=>{passwordWrap.style.display=platformEl.value==='배달의민족'?'block':'none';});fileEl.addEventListener('change',()=>{selectedFile=fileEl.files?.[0]||null;btn.disabled=!selectedFile;statusEl.textContent=selectedFile?`${selectedFile.name} 선택됨. [자동 입력하기]를 눌러주세요.`:'파일을 선택해주세요.';});
+function won(n){return Number(n||0).toLocaleString('ko-KR')+'원'}function num(v){if(typeof v==='number')return v;if(v==null||v==='')return 0;return Number(String(v).replace(/,/g,'').replace(/[원₩]/g,'').trim())||0}function dateOnly(v){if(v instanceof Date&&!isNaN(v))return v.toISOString().slice(0,10);const s=String(v??'').trim();const m=s.match(/(20\d{2})[.\/-](\d{1,2})[.\/-](\d{1,2})/);return m?`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`:''}
+function aggregateCoupang(wb){const ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true}),groups={};for(let i=3;i<rows.length;i++){const r=rows[i],date=dateOnly(r[0]),type=String(r[8]??'').trim();if(!date||type==='취소')continue;const item={date,sales:num(r[11]),brokerage:num(r[16]),payment:num(r[17]),delivery:num(r[21]),coupon:num(r[13]),instant:num(r[22])+num(r[23]),ad:num(r[42]),vat:num(r[28]),deposit:num(r[45])};if(!groups[date])groups[date]={...item};else Object.keys(item).filter(k=>k!=='date').forEach(k=>groups[date][k]+=item[k]);}return Object.values(groups).sort((a,b)=>a.date.localeCompare(b.date)).map(x=>({deposit_date:x.date,channel:'쿠팡이츠',sales_amount:x.sales,brokerage_fee:x.brokerage,delivery_fee:x.delivery,coupon_discount:x.coupon,instant_discount:x.instant,advertising_fee:x.ad,payment_fee:x.payment,vat:x.vat,fee_adjustment:0,vat_adjustment:0,deposit_amount:x.deposit,memo:'쿠팡이츠 정산 자동입력'}));}
+async function parseBaemin(file){const fd=new FormData();fd.append('file',file);fd.append('password',passwordEl.value||'');const res=await fetch('/api/parse-settlement',{method:'POST',body:fd}),text=await res.text();let data;try{data=JSON.parse(text)}catch{throw new Error(text||'배민 파일 분석에 실패했습니다.')}if(!res.ok)throw new Error(data.error||'배민 파일 분석에 실패했습니다.');return data.rows;}
+async function importRows(rows){if(!rows.length)throw new Error('저장할 정산 데이터가 없습니다.');const dates=rows.map(r=>r.deposit_date),minDate=dates.reduce((a,b)=>a<b?a:b),maxDate=dates.reduce((a,b)=>a>b?a:b);const{data:existing,error}=await supabaseClient.from('deposit_details').select('id,deposit_date,channel').eq('channel',rows[0].channel).gte('deposit_date',minDate).lte('deposit_date',maxDate);if(error)throw error;const existingKeys=new Set((existing||[]).map(x=>`${x.deposit_date}|${x.channel}`)),fresh=rows.filter(r=>!existingKeys.has(`${r.deposit_date}|${r.channel}`));if(fresh.length){const{error:insertError}=await supabaseClient.from('deposit_details').insert(fresh);if(insertError)throw insertError;}return{inserted:fresh.length,skipped:rows.length-fresh.length};}
+btn.addEventListener('click',async()=>{if(!selectedFile)return;btn.disabled=true;statusEl.className='status';statusEl.textContent='파일을 분석하고 있습니다...';try{let rows;if(platformEl.value==='쿠팡이츠'){const wb=XLSX.read(await selectedFile.arrayBuffer(),{type:'array',cellDates:true});rows=aggregateCoupang(wb)}else{rows=await parseBaemin(selectedFile)}const totals=rows.reduce((a,r)=>{a.sales+=num(r.sales_amount);a.deposit+=num(r.deposit_amount);return a},{sales:0,deposit:0}),result=await importRows(rows);document.getElementById('resultCard').style.display='block';document.getElementById('count').textContent=rows.length+'건';document.getElementById('sales').textContent=won(totals.sales);document.getElementById('deposit').textContent=won(totals.deposit);document.getElementById('detail').innerHTML=`<span class="ok">자동 입력 완료</span><br>새로 입력: ${result.inserted}건 · 이미 있던 날짜: ${result.skipped}건<br>기간: ${rows[0].deposit_date} ~ ${rows[rows.length-1].deposit_date}`;statusEl.className='status ok';statusEl.textContent='완료되었습니다.'}catch(e){console.error(e);statusEl.className='status err';statusEl.textContent='오류: '+e.message}finally{btn.disabled=false}});
+</script>
+</body></html>
