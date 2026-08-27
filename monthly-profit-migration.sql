@@ -1,0 +1,1 @@
+alter table public.monthly_profit add column if not exists details jsonb not null default '{}'::jsonb;
