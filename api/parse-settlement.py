@@ -43,15 +43,18 @@ def decrypt_if_needed(raw: bytes, password: str) -> io.BytesIO:
             return source
         if not password:
             raise ValueError("배민 엑셀 파일의 비밀번호를 입력해주세요.")
-        office.load_key(password=password, verify_password=True)
+        # 일부 배민 파일은 verify_password 단계에서 호환성 문제가 생길 수 있어
+        # 실제 복호화까지 진행한 뒤 결과 ZIP이 정상인지 라이브러리가 검증하도록 한다.
+        office.load_key(password=password)
         out = io.BytesIO()
         office.decrypt(out)
         out.seek(0)
         return out
-    except ValueError:
-        raise
     except Exception as exc:
-        raise ValueError("엑셀 비밀번호가 맞지 않거나 파일을 읽을 수 없습니다.") from exc
+        name = exc.__class__.__name__
+        if "InvalidKey" in name or "Key" in name:
+            raise ValueError("엑셀 비밀번호가 맞지 않습니다.") from exc
+        raise ValueError("배민 엑셀 파일을 복호화하지 못했습니다. 파일 형식 또는 비밀번호를 확인해주세요.") from exc
 
 def build_headers(raw_df: pd.DataFrame):
     header_rows = min(3, len(raw_df))
