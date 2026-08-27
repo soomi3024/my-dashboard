@@ -43,8 +43,6 @@ def decrypt_if_needed(raw: bytes, password: str) -> io.BytesIO:
             return source
         if not password:
             raise ValueError("배민 엑셀 파일의 비밀번호를 입력해주세요.")
-        # 일부 배민 파일은 verify_password 단계에서 호환성 문제가 생길 수 있어
-        # 실제 복호화까지 진행한 뒤 결과 ZIP이 정상인지 라이브러리가 검증하도록 한다.
         office.load_key(password=password)
         out = io.BytesIO()
         office.decrypt(out)
@@ -57,7 +55,7 @@ def decrypt_if_needed(raw: bytes, password: str) -> io.BytesIO:
         raise ValueError("배민 엑셀 파일을 복호화하지 못했습니다. 파일 형식 또는 비밀번호를 확인해주세요.") from exc
 
 def build_headers(raw_df: pd.DataFrame):
-    header_rows = min(3, len(raw_df))
+    header_rows = min(6, len(raw_df))
     headers = []
     for c in raw_df.columns:
         parts = []
@@ -84,6 +82,14 @@ def parse_baemin(stream: io.BytesIO):
         raise ValueError("배민 정산 파일 구조를 읽지 못했습니다.")
     headers = build_headers(raw)
     date_cols = find_cols(headers, ["입금일"])
+    # 배민 파일 형식에 따라 병합 셀/헤더 인식 방식이 달라질 수 있어
+    # 첫 번째 열을 날짜 열 후보로 안전하게 사용한다.
+    if not date_cols:
+        for c in range(min(5, raw.shape[1])):
+            values = [date_only(raw.iloc[r, c]) for r in range(min(10, len(raw)))]
+            if sum(bool(x) for x in values) >= 1:
+                date_cols = [c]
+                break
     if not date_cols:
         raise ValueError("입금일 열을 찾지 못했습니다.")
     date_col = date_cols[0]
