@@ -27,12 +27,12 @@ def date_only(v):
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return ""
     dt = pd.to_datetime(v, errors="coerce")
-    if pd.isna(dt):
-        m = re.search(r"(20\d{2})[./-](\d{1,2})[./-](\d{1,2})", str(v))
-        if not m:
-            return ""
+    if pd.notna(dt):
+        return dt.strftime("%Y-%m-%d")
+    m = re.search(r"(20\d{2})[./-](\d{1,2})[./-](\d{1,2})", str(v))
+    if m:
         return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
-    return dt.strftime("%Y-%m-%d")
+    return ""
 
 def decrypt_if_needed(raw: bytes, password: str) -> io.BytesIO:
     source = io.BytesIO(raw)
@@ -66,80 +66,75 @@ def build_headers(raw_df: pd.DataFrame):
         headers.append(" ".join(parts))
     return headers
 
-def find_cols(headers, group_keywords, sub_keywords=()):
+def find_cols(headers, keyword_groups, sub_keywords=()):
     matches = []
     for i, h in enumerate(headers):
         nh = norm(h)
-        if all(k in nh for k in group_keywords):
-            score = sum(10 for k in sub_keywords if k in nh)
-            matches.append((score, i))
+        for group in keyword_groups:
+            if all(k in nh for k in group):
+                score = sum(10 for k in sub_keywords if k in nh)
+                matches.append((score, i))
+                break
     matches.sort(reverse=True)
     return [i for _, i in matches]
 
-def find_order_cols(headers):
-    # 배민 파일의 버전별 표기 차이를 모두 허용한다.
-    candidates = []
-    for i, h in enumerate(headers):
-        nh = norm(h)
-        if "주문" in nh and any(k in nh for k in ("금액", "합계", "매출")):
-            score = 0
-            if "합계" in nh:
-                score += 50
-            if "주문금액" in nh:
-                score += 30
-            if "배달주문금액" in nh:
-                score += 20
-            if "비배달" in nh:
-                score += 5
-            candidates.append((score, i))
-    candidates.sort(reverse=True)
-    return [i for _, i in candidates]
+def best_date_col(raw, headers):
+    cols = find_cols(headers, [["입금일"], ["지급일"], ["정산일"], ["입금", "일자"], ["지급", "일자"]])
+    if cols:
+        return cols[0]
+    # 배민 파일의 병합/다중 헤더 구조가 바뀌어도 실제 데이터에서 날짜가 많은 열을 찾는다.
+    best = None
+    best_count = 0
+    for c in range(raw.shape[1]):
+        count = sum(bool(date_only(raw.iloc[r, c])) for r in range(len(raw)))
+        if count > best_count:
+            best_count = count
+            best = c
+    if best is not None and best_count >= 2:
+        return best
+    return None
+
+def best_amount_col(raw, headers, groups, fallback_keywords=()):
+    cols = find_cols(headers, groups)
+    if cols:
+        return cols[0]
+    if fallback_keywords:
+        cols = find_cols(headers, [[k] for k in fallback_keywords])
+        if cols:
+            return cols[0]
+    return None
 
 def parse_baemin(stream: io.BytesIO):
     raw = pd.read_excel(stream, header=None, dtype=object)
     if raw.empty or len(raw) < 2:
         raise ValueError("배민 정산 파일 구조를 읽지 못했습니다.")
     headers = build_headers(raw)
-    date_cols = find_cols(headers, ["입금일"])
-    if not date_cols:
-        for c in range(min(8, raw.shape[1])):
-            values = [date_only(raw.iloc[r, c]) for r in range(min(15, len(raw)))]
-            if sum(bool(x) for x in values) >= 2:
-                date_cols = [c]
-                break
-    if not date_cols:
+    date_col = best_date_col(raw, headers)
+    if date_col is None:
         raise ValueError("입금일 열을 찾지 못했습니다.")
-    date_col = date_cols[0]
 
-    deposit_cols = find_cols(headers, ["입금금액"]) or find_cols(headers, ["입금", "금액"])
-    if not deposit_cols:
+    deposit_col = best_amount_col(
+        raw, headers,
+        [["입금금액"], ["입금", "금액"], ["실입금액"], ["최종", "입금"], ["정산", "금액"], ["지급", "금액"]],
+        ("입금금액", "실입금액", "정산금액", "지급금액")
+    )
+    sales_col = best_amount_col(
+        raw, headers,
+        [["주문금액", "합계"], ["주문금액"], ["주문", "금액"], ["매출금액"], ["매출", "합계"]],
+        ("주문금액", "매출금액", "주문합계")
+    )
+    if deposit_col is None:
         raise ValueError("최종 입금금액 열을 찾지 못했습니다.")
-    deposit_col = deposit_cols[-1]
-
-    sales_cols = find_cols(headers, ["주문금액"], ["합계"]) or find_cols(headers, ["주문금액"])
-    if not sales_cols:
-        sales_cols = find_order_cols(headers)
-    if not sales_cols:
-        # 마지막 안전장치: '주문'이 들어간 숫자성 열을 찾는다.
-        for i, h in enumerate(headers):
-            if "주문" in norm(h):
-                numeric_count = sum(to_num(raw.iloc[r, i]) != 0 for r in range(min(len(raw), 50)))
-                if numeric_count >= 1:
-                    sales_cols.append(i)
-        sales_cols = list(dict.fromkeys(sales_cols))
-    if not sales_cols:
+    if sales_col is None:
         raise ValueError("주문금액 열을 찾지 못했습니다.")
-    # 합계 열이 있으면 하나만, 없으면 주문금액 관련 열을 합산한다.
-    sales_col = sales_cols[0]
-    use_sales_cols = sales_cols if len(sales_cols) > 1 else [sales_col]
 
-    brokerage_cols = find_cols(headers, ["중개이용료"], ["합계"]) or find_cols(headers, ["중개이용료"])
-    discount_cols = find_cols(headers, ["고객할인비용"], ["합계"]) or find_cols(headers, ["고객할인비용"])
-    delivery_cols = find_cols(headers, ["배달비"], ["합계"]) or find_cols(headers, ["배달비"])
-    payment_cols = find_cols(headers, ["결제대행수수료"], ["합계"]) or find_cols(headers, ["결제대행수수료"])
-    vat_cols = find_cols(headers, ["부가세"], ["합계"]) or find_cols(headers, ["부가세"])
-    instant_cols = find_cols(headers, ["즉시할인"], ["합계"]) or find_cols(headers, ["즉시할인"])
-    ad_cols = find_cols(headers, ["광고비"], ["합계"]) or find_cols(headers, ["광고비"])
+    brokerage_cols = find_cols(headers, [["중개이용료"]])
+    discount_cols = find_cols(headers, [["고객할인비용"]])
+    delivery_cols = find_cols(headers, [["배달비"]])
+    payment_cols = find_cols(headers, [["결제대행수수료"], ["결제", "대행", "수수료"]])
+    vat_cols = find_cols(headers, [["부가세"]])
+    instant_cols = find_cols(headers, [["즉시할인"]])
+    ad_cols = find_cols(headers, [["광고비"]])
 
     def group_value(row, cols):
         return sum(to_num(row.iloc[c]) for c in cols) if cols else 0.0
@@ -150,7 +145,7 @@ def parse_baemin(stream: io.BytesIO):
         if not date:
             continue
         row = raw.iloc[r]
-        sales = sum(to_num(row.iloc[c]) for c in use_sales_cols)
+        sales = to_num(row.iloc[sales_col])
         deposit = to_num(row.iloc[deposit_col])
         if sales == 0 and deposit == 0:
             continue
