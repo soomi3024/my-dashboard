@@ -136,6 +136,7 @@ def parse_baemin(stream: io.BytesIO):
     return [groups[k] for k in sorted(groups)]
 
 @app.post("/")
+@app.post("/api/parse-settlement")
 async def parse_settlement(file: UploadFile = File(...), password: str = Form("")):
     if not file.filename:
         raise HTTPException(status_code=400, detail="파일이 없습니다.")
