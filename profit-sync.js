@@ -1,6 +1,7 @@
 // 월별 손익관리 - Supabase 저장/조회/그래프 연결
 (function () {
   const TABLE = "monthly_profit";
+  const SALES_TABLE = "sales";
   const SUPABASE_URL = "https://gvlfyzdswegwmmpzoabc.supabase.co";
   const SUPABASE_KEY = "sb_publishable_Inp1yZHn3Qrqtzq1TWgUaw_AWxEgK5y";
   const FIELD_IDS = [
@@ -93,7 +94,6 @@
         if (details) {
           applyDetails(details);
         } else {
-          // 기존 저장 데이터도 최대한 복원
           applyDetails({
             profitLogistics: data.logistics_amount || 0,
             profitLabor: data.labor_amount || 0,
@@ -153,31 +153,104 @@
     return box;
   }
 
+  function parseDetails(row) {
+    try {
+      const parsed = JSON.parse(row?.memo || "");
+      if (parsed?.__profitDetails && parsed.details) return parsed.details;
+    } catch (_) {}
+    return null;
+  }
+
+  function calculateHistoryProfit(row, sales) {
+    const details = parseDetails(row);
+    const actualSales = Number(sales || 0);
+
+    if (details) {
+      const logistics = valueFrom(details,"profitLogistics");
+      const delivery = valueFrom(details,"profitDeliveryFee");
+      const card = valueFrom(details,"profitCardFee");
+      const ads = valueFrom(details,"profitAdvertising");
+      const royalty = Math.round(actualSales * 0.02 * 1.1);
+      const gas = valueFrom(details,"profitGas");
+      const utility = valueFrom(details,"profitUtility");
+      const insurance = valueFrom(details,"profitInsurance");
+      const labor = valueFrom(details,"profitLabor");
+      const rent = valueFrom(details,"profitRent");
+      const torder = valueFrom(details,"profitTorder");
+      const pos = valueFrom(details,"profitPos");
+      const accountant = valueFrom(details,"profitTaxAccountant");
+      const otherFixed = valueFrom(details,"profitOtherFixed");
+      const interest = valueFrom(details,"profitLoanInterest");
+      const other = valueFrom(details,"profitOther");
+      const variable = logistics + delivery + card + ads + royalty + gas + utility + insurance;
+      const fixed = labor + rent + torder + pos + accountant + otherFixed;
+      return actualSales - variable - fixed - interest - other;
+    }
+
+    const royalty = Math.round(actualSales * 0.02 * 1.1);
+    return actualSales
+      - Number(row.logistics_amount || 0)
+      - Number(row.labor_amount || 0)
+      - Number(row.rent_amount || 0)
+      - Number(row.utilities_amount || 0)
+      - Number(row.ads_amount || 0)
+      - Number(row.other_amount || 0)
+      - royalty;
+  }
+
   async function renderProfitHistory() {
     if (!client) return;
     const box = makeChartBox();
     if (!box) return;
+
     try {
-      const { data, error } = await client.from(TABLE).select("month,sales_amount,profit_amount,profit_rate").order("month", { ascending: true });
-      if (error) throw error;
-      const rows = data || [];
+      const [{ data: profitRows, error: profitError }, { data: salesRows, error: salesError }] = await Promise.all([
+        client.from(TABLE).select("month,sales_amount,profit_amount,profit_rate,logistics_amount,labor_amount,rent_amount,utilities_amount,ads_amount,other_amount,memo").order("month", { ascending: true }),
+        client.from(SALES_TABLE).select("sale_date,amount")
+      ]);
+      if (profitError) throw profitError;
+      if (salesError) throw salesError;
+
+      const salesByMonth = {};
+      (salesRows || []).forEach(row => {
+        const month = String(row.sale_date || "").slice(0, 7);
+        if (!month) return;
+        salesByMonth[month] = (salesByMonth[month] || 0) + Number(row.amount || 0);
+      });
+
+      const rows = (profitRows || []).map(row => {
+        const hasActualSales = Object.prototype.hasOwnProperty.call(salesByMonth, row.month);
+        const sales = hasActualSales ? salesByMonth[row.month] : Number(row.sales_amount || 0);
+        const profit = calculateHistoryProfit(row, sales);
+        const rate = sales > 0 ? profit / sales * 100 : 0;
+        return { month: row.month, sales, profit, rate };
+      });
+
       const chart = el("profitHistoryChart");
       const list = el("profitHistoryList");
       if (!chart || !list) return;
+
       if (!rows.length) {
         chart.innerHTML = `<div style="width:100%;text-align:center;color:#777">저장된 월별 손익 데이터가 없습니다.</div>`;
         list.innerHTML = "";
         return;
       }
-      const max = Math.max(...rows.map(r => Math.abs(Number(r.profit_amount || 0))), 1);
+
+      const max = Math.max(...rows.map(r => Math.abs(r.profit)), 1);
       chart.innerHTML = rows.map(r => {
-        const profit = Number(r.profit_amount || 0);
-        const height = Math.max(6, Math.round(Math.abs(profit) / max * 180));
-        const color = profit < 0 ? "#ef4444" : "#22c55e";
-        return `<div title="${r.month} · 순이익 ${money(profit)}" style="min-width:62px;height:220px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px"><strong style="font-size:10px">${money(profit)}</strong><div style="width:38px;height:${height}px;background:${color};border-radius:6px 6px 0 0"></div><span style="font-size:11px;color:#666">${r.month}</span></div>`;
+        const height = Math.max(6, Math.round(Math.abs(r.profit) / max * 180));
+        const color = r.profit < 0 ? "#ef4444" : "#22c55e";
+        const sign = r.profit < 0 ? "손실" : "이익";
+        return `<div title="${r.month} · ${sign} ${money(Math.abs(r.profit))}" style="min-width:70px;height:220px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px"><strong style="font-size:10px">${money(r.profit)}</strong><div style="width:38px;height:${height}px;background:${color};border-radius:6px 6px 0 0"></div><span style="font-size:11px;color:#666">${r.month}</span></div>`;
       }).join("");
-      list.innerHTML = [...rows].reverse().map(r => `<div style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #eee"><strong>${r.month}</strong><span>${money(r.sales_amount)} · 순이익 <strong>${money(r.profit_amount)}</strong> (${Number(r.profit_rate || 0).toFixed(1)}%)</span></div>`).join("");
-    } catch (error) { console.error("월별 손익 그래프 실패", error); }
+
+      list.innerHTML = [...rows].reverse().map(r => {
+        const sign = r.profit < 0 ? "순손실" : "순이익";
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eee"><strong>${r.month}</strong><span>매출 ${money(r.sales)} · ${sign} <strong>${money(Math.abs(r.profit))}</strong> (${r.rate.toFixed(1)}%)</span></div>`;
+      }).join("");
+    } catch (error) {
+      console.error("월별 손익 그래프 실패", error);
+    }
   }
 
   function install() {
